@@ -4,6 +4,7 @@ mod client;
 mod config;
 mod errors;
 mod logging;
+mod output;
 
 use clap::Parser;
 use std::process::ExitCode;
