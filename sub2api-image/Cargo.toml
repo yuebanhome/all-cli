@@ -13,6 +13,7 @@ toml = "0.8"
 base64 = "0.22"
 anyhow = "1"
 thiserror = "1"
+os_info = { version = "3", default-features = false }
 
 [dev-dependencies]
 httpmock = "0.7"
