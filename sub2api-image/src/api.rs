@@ -1,6 +1,11 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+use crate::logging::Logger;
+use anyhow::{bail, Context, Result};
+use reqwest::blocking::{Client, Response};
+use std::time::Instant;
+
 #[derive(Debug, Serialize)]
 pub struct GenerateReq {
     pub prompt: String,
@@ -55,6 +60,76 @@ pub struct EffectiveCfg {
     pub prompt: String,
     pub image: Option<PathBuf>,
     pub mask: Option<PathBuf>,
+}
+
+pub fn generate(client: &Client, cfg: &EffectiveCfg, log: &Logger) -> Result<ApiResponse> {
+    let url = format!("{}/v1/images/generations", cfg.base_url.trim_end_matches('/'));
+    let req = GenerateReq {
+        prompt: cfg.prompt.clone(),
+        model: cfg.model.clone(),
+        n: 1,
+        size: cfg.size.clone(),
+        quality: cfg.quality.clone(),
+    };
+    log.endpoint("POST", &url);
+    log.body(&format!(
+        "prompt_len={} size={} quality={} model={}",
+        cfg.prompt.len(),
+        cfg.size,
+        cfg.quality,
+        cfg.model,
+    ));
+    let t0 = Instant::now();
+    let resp = client
+        .post(&url)
+        .bearer_auth(&cfg.api_key)
+        .json(&req)
+        .send()
+        .map_err(|e| anyhow::anyhow!("network error: {}", e))?;
+    decode_response(resp, &url, t0, log)
+}
+
+fn decode_response(
+    resp: Response,
+    url: &str,
+    t0: Instant,
+    log: &Logger,
+) -> Result<ApiResponse> {
+    let status = resp.status();
+    let bytes = resp
+        .bytes()
+        .map_err(|e| anyhow::anyhow!("network error reading body: {}", e))?;
+    log.received(status.as_u16(), t0.elapsed(), bytes.len());
+
+    if status.is_success() {
+        let parsed: ApiResponse = serde_json::from_slice(&bytes)
+            .with_context(|| format!("response parse error from {}", url))?;
+        log.response_summary(&parsed);
+        Ok(parsed)
+    } else {
+        let body_text = String::from_utf8_lossy(&bytes);
+        let msg = match serde_json::from_slice::<ApiError>(&bytes) {
+            Ok(api_err) => format!(
+                "{} {}: {}\n  param: {}\n  endpoint: POST {}",
+                status.as_u16(),
+                api_err.error.err_type.as_deref().unwrap_or("unknown"),
+                api_err.error.message,
+                api_err.error.param.as_deref().unwrap_or("null"),
+                url,
+            ),
+            Err(_) => format!(
+                "{}: {}\n  endpoint: POST {}",
+                status.as_u16(),
+                truncate(&body_text, 2048),
+                url,
+            ),
+        };
+        bail!("api error: {}", msg)
+    }
+}
+
+fn truncate(s: &str, max: usize) -> String {
+    if s.len() <= max { s.to_string() } else { format!("{}...(truncated)", &s[..max]) }
 }
 
 #[cfg(test)]
@@ -126,5 +201,19 @@ mod tests {
         let json = r#"{"error":{"code":"authentication_error","type":"authentication_error","message":"Invalid API key","param":null}}"#;
         let err: ApiError = serde_json::from_str(json).unwrap();
         assert!(err.error.param.is_none());
+    }
+
+    #[test]
+    fn truncate_short_unchanged() {
+        assert_eq!(truncate("hi", 10), "hi");
+    }
+
+    #[test]
+    fn truncate_long_is_cut() {
+        let s = "a".repeat(100);
+        let r = truncate(&s, 10);
+        assert_eq!(r.len(), 10 + "...(truncated)".len());
+        assert!(r.starts_with("aaaaaaaaaa"));
+        assert!(r.ends_with("(truncated)"));
     }
 }
