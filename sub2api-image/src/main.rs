@@ -52,7 +52,7 @@ fn run(args: &cli::Args) -> anyhow::Result<()> {
     let log = logging::Logger::new(args.quiet);
     let client = client::build_client()?;
     let resp = if effective.image.is_some() {
-        anyhow::bail!("input error: edit endpoint not implemented yet");
+        api::edit(&client, &effective, &log)?
     } else {
         api::generate(&client, &effective, &log)?
     };

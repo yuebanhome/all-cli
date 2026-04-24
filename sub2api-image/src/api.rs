@@ -89,6 +89,50 @@ pub fn generate(client: &Client, cfg: &EffectiveCfg, log: &Logger) -> Result<Api
     decode_response(resp, &url, t0, log)
 }
 
+pub fn edit(client: &Client, cfg: &EffectiveCfg, log: &Logger) -> Result<ApiResponse> {
+    use reqwest::blocking::multipart;
+
+    let url = format!("{}/v1/images/edits", cfg.base_url.trim_end_matches('/'));
+    let image = cfg
+        .image
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("input error: --image required for edit"))?;
+
+    let mut form = multipart::Form::new()
+        .text("prompt", cfg.prompt.clone())
+        .text("model", cfg.model.clone())
+        .text("n", "1")
+        .text("quality", cfg.quality.clone())
+        .text("size", cfg.size.clone())
+        .file("image", image)
+        .with_context(|| format!("io error: cannot read image {}", image.display()))?;
+    if let Some(mask) = &cfg.mask {
+        form = form
+            .file("mask", mask)
+            .with_context(|| format!("io error: cannot read mask {}", mask.display()))?;
+    }
+
+    log.endpoint("POST", &url);
+    log.body(&format!(
+        "prompt_len={} size={} quality={} model={} image={} mask={}",
+        cfg.prompt.len(),
+        cfg.size,
+        cfg.quality,
+        cfg.model,
+        image.display(),
+        cfg.mask.as_ref().map(|m| m.display().to_string()).unwrap_or_else(|| "<none>".into()),
+    ));
+
+    let t0 = Instant::now();
+    let resp = client
+        .post(&url)
+        .bearer_auth(&cfg.api_key)
+        .multipart(form)
+        .send()
+        .map_err(|e| anyhow::anyhow!("network error: {}", e))?;
+    decode_response(resp, &url, t0, log)
+}
+
 fn decode_response(
     resp: Response,
     url: &str,
