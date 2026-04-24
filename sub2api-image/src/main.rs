@@ -1,7 +1,9 @@
 mod api;
 mod cli;
+mod client;
 mod config;
 mod errors;
+mod logging;
 
 use clap::Parser;
 use std::process::ExitCode;
