@@ -48,6 +48,34 @@ pub fn load() -> Result<Config> {
     Ok(cfg)
 }
 
+const TEMPLATE: &str = r#"# sub2api-image config
+base_url = "https://REPLACE_ME.example.com"
+api_key  = "REPLACE_ME"
+
+[defaults]
+model   = "gpt-image-2"
+size    = "auto"
+quality = "auto"
+"#;
+
+pub fn write_template() -> Result<std::path::PathBuf> {
+    let path = resolve_config_path();
+    if path.exists() {
+        bail!(
+            "config error: config already exists at {}, edit manually",
+            path.display()
+        );
+    }
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).with_context(|| {
+            format!("io error: cannot create config dir {}", parent.display())
+        })?;
+    }
+    std::fs::write(&path, TEMPLATE)
+        .with_context(|| format!("io error: cannot write {}", path.display()))?;
+    Ok(path)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -180,5 +208,31 @@ api_key = ""
         let _g = isolate_env(dir.path());
         let err = load().unwrap_err();
         assert!(err.to_string().contains("config error"));
+    }
+
+    #[test]
+    fn write_template_creates_file() {
+        let dir = TempDir::new().unwrap();
+        let _g = isolate_env(dir.path());
+        let path = write_template().unwrap();
+        assert!(path.exists());
+        let content = std::fs::read_to_string(&path).unwrap();
+        assert!(content.contains("REPLACE_ME"));
+    }
+
+    #[test]
+    fn write_template_refuses_overwrite() {
+        let dir = TempDir::new().unwrap();
+        std::fs::create_dir_all(dir.path()).unwrap();
+        std::fs::write(dir.path().join("config.toml"), "existing").unwrap();
+        let _g = isolate_env(dir.path());
+        let err = write_template().unwrap_err();
+        assert!(err.to_string().contains("already exists"));
+    }
+
+    #[test]
+    fn template_roundtrip_parses() {
+        // 模板内容应能被 TOML 解析器接受（即使字段是 REPLACE_ME）
+        let _: toml::Value = toml::from_str(TEMPLATE).expect("template must parse");
     }
 }
