@@ -54,12 +54,18 @@ impl Args {
         }
         if let Some(img) = &self.image {
             if !img.exists() {
-                bail!("input error: --image file does not exist: {}", img.display());
+                bail!(
+                    "input error: --image file does not exist: {}",
+                    img.display()
+                );
             }
         }
         if let Some(mask) = &self.mask {
             if !mask.exists() {
-                bail!("input error: --mask file does not exist: {}", mask.display());
+                bail!(
+                    "input error: --mask file does not exist: {}",
+                    mask.display()
+                );
             }
         }
         Ok(())
@@ -104,13 +110,28 @@ mod tests {
 
     #[test]
     fn mask_without_image_rejected_by_clap() {
-        let r = Args::try_parse_from(["sub2api-image", "--prompt", "x", "-o", "/tmp/x.png", "--mask", "m.png"]);
+        let r = Args::try_parse_from([
+            "sub2api-image",
+            "--prompt",
+            "x",
+            "-o",
+            "/tmp/x.png",
+            "--mask",
+            "m.png",
+        ]);
         assert!(r.is_err(), "clap should reject --mask without --image");
     }
 
     #[test]
     fn image_missing_file_fails_validate() {
-        let a = args_from(&["--prompt", "x", "-o", "/tmp/x.png", "--image", "/nonexistent-path-xxx.png"]);
+        let a = args_from(&[
+            "--prompt",
+            "x",
+            "-o",
+            "/tmp/x.png",
+            "--image",
+            "/nonexistent-path-xxx.png",
+        ]);
         let err = a.validate().unwrap_err();
         assert!(err.to_string().contains("--image file does not exist"));
     }

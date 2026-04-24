@@ -37,11 +37,15 @@ fn run(args: &cli::Args) -> anyhow::Result<()> {
     let effective = api::EffectiveCfg {
         base_url: cfg.base_url,
         api_key: cfg.api_key,
-        model: args.model.clone()
+        model: args
+            .model
+            .clone()
             .or(cfg.defaults.model)
             .unwrap_or_else(|| "gpt-image-2".into()),
         size: cfg.defaults.size.unwrap_or_else(|| "auto".into()),
-        quality: args.quality.clone()
+        quality: args
+            .quality
+            .clone()
             .or(cfg.defaults.quality)
             .unwrap_or_else(|| "auto".into()),
         prompt: args.prompt.clone().expect("validated above"),

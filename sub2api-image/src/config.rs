@@ -11,7 +11,9 @@ pub fn resolve_config_path() -> PathBuf {
         return PathBuf::from(home).join("config.toml");
     }
     let home = env::var("HOME").unwrap_or_default();
-    PathBuf::from(home).join(".sub2api-image").join("config.toml")
+    PathBuf::from(home)
+        .join(".sub2api-image")
+        .join("config.toml")
 }
 
 #[derive(Debug, Deserialize)]
@@ -67,9 +69,8 @@ pub fn write_template() -> Result<std::path::PathBuf> {
         );
     }
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).with_context(|| {
-            format!("io error: cannot create config dir {}", parent.display())
-        })?;
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("io error: cannot create config dir {}", parent.display()))?;
     }
     std::fs::write(&path, TEMPLATE)
         .with_context(|| format!("io error: cannot write {}", path.display()))?;
@@ -94,8 +95,12 @@ mod tests {
         // 恢复
         env::remove_var("SUB2API_IMAGE_CONFIG");
         env::remove_var("SUB2API_IMAGE_HOME");
-        if let Some(v) = saved_cfg { env::set_var("SUB2API_IMAGE_CONFIG", v); }
-        if let Some(v) = saved_home { env::set_var("SUB2API_IMAGE_HOME", v); }
+        if let Some(v) = saved_cfg {
+            env::set_var("SUB2API_IMAGE_CONFIG", v);
+        }
+        if let Some(v) = saved_home {
+            env::set_var("SUB2API_IMAGE_HOME", v);
+        }
     }
 
     #[test]
@@ -105,11 +110,18 @@ mod tests {
 
         env::remove_var("SUB2API_IMAGE_CONFIG");
         env::set_var("SUB2API_IMAGE_HOME", "/tmp/custom");
-        assert_eq!(resolve_config_path(), PathBuf::from("/tmp/custom/config.toml"));
+        assert_eq!(
+            resolve_config_path(),
+            PathBuf::from("/tmp/custom/config.toml")
+        );
 
         env::remove_var("SUB2API_IMAGE_HOME");
-        if let Some(v) = saved_cfg { env::set_var("SUB2API_IMAGE_CONFIG", v); }
-        if let Some(v) = saved_home { env::set_var("SUB2API_IMAGE_HOME", v); }
+        if let Some(v) = saved_cfg {
+            env::set_var("SUB2API_IMAGE_CONFIG", v);
+        }
+        if let Some(v) = saved_home {
+            env::set_var("SUB2API_IMAGE_HOME", v);
+        }
     }
 
     use tempfile::TempDir;
@@ -137,8 +149,12 @@ mod tests {
         fn drop(&mut self) {
             env::remove_var("SUB2API_IMAGE_CONFIG");
             env::remove_var("SUB2API_IMAGE_HOME");
-            if let Some(v) = &self.cfg { env::set_var("SUB2API_IMAGE_CONFIG", v); }
-            if let Some(v) = &self.home { env::set_var("SUB2API_IMAGE_HOME", v); }
+            if let Some(v) = &self.cfg {
+                env::set_var("SUB2API_IMAGE_CONFIG", v);
+            }
+            if let Some(v) = &self.home {
+                env::set_var("SUB2API_IMAGE_HOME", v);
+            }
         }
     }
 
@@ -155,7 +171,8 @@ model = "gpt-image-2"
 size = "1024x1024"
 quality = "high"
 "#,
-        ).unwrap();
+        )
+        .unwrap();
         let _g = isolate_env(dir.path());
         let cfg = load().unwrap();
         assert_eq!(cfg.base_url, "https://x.example.com");
@@ -172,7 +189,8 @@ quality = "high"
             r#"base_url = "https://x.example.com"
 api_key = "sk-abc"
 "#,
-        ).unwrap();
+        )
+        .unwrap();
         let _g = isolate_env(dir.path());
         let cfg = load().unwrap();
         assert!(cfg.defaults.model.is_none());
@@ -186,7 +204,8 @@ api_key = "sk-abc"
             r#"base_url = "https://x.example.com"
 api_key = ""
 "#,
-        ).unwrap();
+        )
+        .unwrap();
         let _g = isolate_env(dir.path());
         let err = load().unwrap_err();
         assert!(err.to_string().contains("config error"));

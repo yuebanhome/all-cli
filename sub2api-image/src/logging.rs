@@ -11,17 +11,23 @@ impl Logger {
     }
 
     pub fn endpoint(&self, method: &str, url: &str) {
-        if self.quiet { return; }
+        if self.quiet {
+            return;
+        }
         eprintln!("[sub2api-image] endpoint: {} {}", method, url);
     }
 
     pub fn body(&self, s: &str) {
-        if self.quiet { return; }
+        if self.quiet {
+            return;
+        }
         eprintln!("[sub2api-image] body: {}", s);
     }
 
     pub fn received(&self, status: u16, elapsed: Duration, bytes: usize) {
-        if self.quiet { return; }
+        if self.quiet {
+            return;
+        }
         eprintln!(
             "[sub2api-image] ← {} in {:.1}s  bytes={}",
             status,
@@ -31,7 +37,9 @@ impl Logger {
     }
 
     pub fn response_summary(&self, r: &ApiResponse) {
-        if self.quiet { return; }
+        if self.quiet {
+            return;
+        }
         if let Some(u) = &r.usage {
             eprintln!(
                 "[sub2api-image] usage: total={} in={} out={}",
@@ -39,7 +47,9 @@ impl Logger {
             );
         }
         let first = r.data.first();
-        let b64_len = first.and_then(|d| d.b64_json.as_ref().map(|s| s.len())).unwrap_or(0);
+        let b64_len = first
+            .and_then(|d| d.b64_json.as_ref().map(|s| s.len()))
+            .unwrap_or(0);
         let url_some = first.and_then(|d| d.url.as_ref()).is_some();
         let rev_some = first.and_then(|d| d.revised_prompt.as_ref()).is_some();
         eprintln!(

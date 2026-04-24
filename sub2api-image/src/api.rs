@@ -63,7 +63,10 @@ pub struct EffectiveCfg {
 }
 
 pub fn generate(client: &Client, cfg: &EffectiveCfg, log: &Logger) -> Result<ApiResponse> {
-    let url = format!("{}/v1/images/generations", cfg.base_url.trim_end_matches('/'));
+    let url = format!(
+        "{}/v1/images/generations",
+        cfg.base_url.trim_end_matches('/')
+    );
     let req = GenerateReq {
         prompt: cfg.prompt.clone(),
         model: cfg.model.clone(),
@@ -120,7 +123,10 @@ pub fn edit(client: &Client, cfg: &EffectiveCfg, log: &Logger) -> Result<ApiResp
         cfg.quality,
         cfg.model,
         image.display(),
-        cfg.mask.as_ref().map(|m| m.display().to_string()).unwrap_or_else(|| "<none>".into()),
+        cfg.mask
+            .as_ref()
+            .map(|m| m.display().to_string())
+            .unwrap_or_else(|| "<none>".into()),
     ));
 
     let t0 = Instant::now();
@@ -133,12 +139,7 @@ pub fn edit(client: &Client, cfg: &EffectiveCfg, log: &Logger) -> Result<ApiResp
     decode_response(resp, &url, t0, log)
 }
 
-fn decode_response(
-    resp: Response,
-    url: &str,
-    t0: Instant,
-    log: &Logger,
-) -> Result<ApiResponse> {
+fn decode_response(resp: Response, url: &str, t0: Instant, log: &Logger) -> Result<ApiResponse> {
     let status = resp.status();
     let bytes = resp
         .bytes()
@@ -173,7 +174,11 @@ fn decode_response(
 }
 
 fn truncate(s: &str, max: usize) -> String {
-    if s.len() <= max { s.to_string() } else { format!("{}...(truncated)", &s[..max]) }
+    if s.len() <= max {
+        s.to_string()
+    } else {
+        format!("{}...(truncated)", &s[..max])
+    }
 }
 
 #[cfg(test)]
@@ -219,7 +224,10 @@ mod tests {
           "data": [{ "url": "https://example.com/a.png", "revised_prompt": "updated" }]
         }"#;
         let parsed: ApiResponse = serde_json::from_str(json).unwrap();
-        assert_eq!(parsed.data[0].url.as_deref(), Some("https://example.com/a.png"));
+        assert_eq!(
+            parsed.data[0].url.as_deref(),
+            Some("https://example.com/a.png")
+        );
         assert_eq!(parsed.data[0].revised_prompt.as_deref(), Some("updated"));
         assert!(parsed.usage.is_none());
     }
@@ -235,7 +243,10 @@ mod tests {
           }
         }"#;
         let err: ApiError = serde_json::from_str(json).unwrap();
-        assert_eq!(err.error.message, "mask dimensions must match image dimensions.");
+        assert_eq!(
+            err.error.message,
+            "mask dimensions must match image dimensions."
+        );
         assert_eq!(err.error.param.as_deref(), Some("mask"));
         assert_eq!(err.error.err_type.as_deref(), Some("invalid_request_error"));
     }

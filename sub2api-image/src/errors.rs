@@ -1,7 +1,7 @@
-#[cfg(test)]
-use anyhow::anyhow;
 #[cfg(not(test))]
 use anyhow;
+#[cfg(test)]
+use anyhow::anyhow;
 
 /// 根据 anyhow::Error 链里的消息前缀映射到 exit code。
 /// 约定：所有错误在构造时用特定前缀（如 "config error:" / "api error:"）。
@@ -12,13 +12,21 @@ pub fn exit_code_from(err: &anyhow::Error) -> u8 {
         buf.push_str(" | ");
         buf.push_str(&cause.to_string());
     }
-    if buf.contains("config error") { 2 }
-    else if buf.contains("input error") { 2 }
-    else if buf.contains("network error") { 3 }
-    else if buf.contains("api error") { 4 }
-    else if buf.contains("response parse error") { 5 }
-    else if buf.contains("io error") { 6 }
-    else { 1 }
+    if buf.contains("config error") {
+        2
+    } else if buf.contains("input error") {
+        2
+    } else if buf.contains("network error") {
+        3
+    } else if buf.contains("api error") {
+        4
+    } else if buf.contains("response parse error") {
+        5
+    } else if buf.contains("io error") {
+        6
+    } else {
+        1
+    }
 }
 
 #[cfg(test)]
