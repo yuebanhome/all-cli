@@ -3,7 +3,7 @@ use base64::Engine;
 use httpmock::prelude::*;
 use tempfile::TempDir;
 
-const PNG_1x1: &[u8] = &[
+const PNG_1X1: &[u8] = &[
     137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0,
     0, 0, 31, 21, 196, 137, 0, 0, 0, 13, 73, 68, 65, 84, 120, 156, 99, 0, 1, 0, 0, 5, 0, 1, 13, 10,
     45, 180, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
@@ -28,10 +28,10 @@ api_key  = "test-key"
     // 本地假 image + mask（内容只要存在可读即可；服务器是 mock，不校验图像有效性）
     let image_path = tmp.path().join("origin.png");
     let mask_path = tmp.path().join("mask.png");
-    std::fs::write(&image_path, PNG_1x1).unwrap();
-    std::fs::write(&mask_path, PNG_1x1).unwrap();
+    std::fs::write(&image_path, PNG_1X1).unwrap();
+    std::fs::write(&mask_path, PNG_1X1).unwrap();
 
-    let b64 = base64::engine::general_purpose::STANDARD.encode(PNG_1x1);
+    let b64 = base64::engine::general_purpose::STANDARD.encode(PNG_1X1);
     let mock = server.mock(|when, then| {
         when.method(POST)
             .path("/v1/images/edits")
@@ -88,9 +88,9 @@ api_key  = "test-key"
     .unwrap();
 
     let image_path = tmp.path().join("origin.png");
-    std::fs::write(&image_path, PNG_1x1).unwrap();
+    std::fs::write(&image_path, PNG_1X1).unwrap();
 
-    let b64 = base64::engine::general_purpose::STANDARD.encode(PNG_1x1);
+    let b64 = base64::engine::general_purpose::STANDARD.encode(PNG_1X1);
     let mock = server.mock(|when, then| {
         when.method(POST).path("/v1/images/edits");
         then.status(200)

@@ -17,6 +17,8 @@ pub struct GenerateReq {
 
 #[derive(Debug, Deserialize)]
 pub struct ApiResponse {
+    // kept for doc-completeness and external consumers; not currently logged.
+    #[allow(dead_code)]
     pub created: i64,
     pub data: Vec<ImageData>,
     pub usage: Option<Usage>,
@@ -43,6 +45,9 @@ pub struct ApiError {
 
 #[derive(Debug, Deserialize)]
 pub struct ApiErrorBody {
+    // upstream ships `code` alongside `type`; we display `type` in errors and
+    // keep `code` parsed for Debug output.
+    #[allow(dead_code)]
     pub code: Option<String>,
     #[serde(rename = "type")]
     pub err_type: Option<String>,

@@ -1,20 +1,12 @@
-#[cfg(not(test))]
-use anyhow;
-#[cfg(test)]
-use anyhow::anyhow;
-
 /// 根据 anyhow::Error 链里的消息前缀映射到 exit code。
 /// 约定：所有错误在构造时用特定前缀（如 "config error:" / "api error:"）。
-#[allow(dead_code)]
 pub fn exit_code_from(err: &anyhow::Error) -> u8 {
     let mut buf = err.to_string();
     for cause in err.chain().skip(1) {
         buf.push_str(" | ");
         buf.push_str(&cause.to_string());
     }
-    if buf.contains("config error") {
-        2
-    } else if buf.contains("input error") {
+    if buf.contains("config error") || buf.contains("input error") {
         2
     } else if buf.contains("network error") {
         3
@@ -32,6 +24,7 @@ pub fn exit_code_from(err: &anyhow::Error) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::anyhow;
 
     #[test]
     fn config_error_maps_to_2() {
