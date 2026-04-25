@@ -85,10 +85,17 @@ resolve_version() {
     echo "Failed to query GitHub API at ${api} (network error or rate limit)" >&2
     exit 3
   fi
+  # All tags starting with <cli>-v...
+  # Strip pre-release: SemVer pre-releases have a '-' inside the version part, i.e.
+  #   sub2api-image-v0.1.0       → keep   (version = v0.1.0, no hyphen after v)
+  #   sub2api-image-v0.2.0-rc.1  → drop   (version = v0.2.0-rc.1, has hyphen)
   tag=$(printf '%s' "$body" \
     | grep -o '"tag_name": *"[^"]*"' \
     | sed 's/"tag_name": *"\(.*\)"/\1/' \
     | grep "^${CLI_NAME}-v" \
+    | awk -v p="${CLI_NAME}-v" '
+        { v = substr($0, length(p)+1); if (index(v, "-") == 0) print }
+      ' \
     | head -1 || true)
   if [[ -z "$tag" ]]; then
     echo "No release tagged ${CLI_NAME}-v* found in ${REPO}" >&2; exit 3

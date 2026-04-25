@@ -80,6 +80,19 @@ git push origin :refs/tags/sub2api-image-v0.1.0
 
 非 Rust CLI（Go / Node / ...）：新增 `<lang>-ci.yml` / `<lang>-release.yml` 两个 reusable workflow（按 `rust-ci.yml` / `rust-release.yml` 的模板写），per-CLI 触发文件继续保持薄壳。安装脚本完全语言无关，不需要任何改动 —— 只要新 CLI 遵循同样的产物命名约定（`<cli>-v<ver>-<triple>.<ext>` + `SHA256SUMS`）。
 
+## 首次启用分支保护的特殊说明
+
+`pr-status.yml` 把 `actions/checkout` 钉到 `pull_request.base.sha`（即 main），用 main 上的 `wait-for-ci.sh` 执行检查。这是必要的安全设计 —— required check 不应跑 PR 作者控制的代码。
+
+但**第一次**把 `pr-status.yml` 与 `wait-for-ci.sh` 引入 main 的 PR 是个例外：当这个 PR 自身在跑 `pr-status` workflow 时，main 上还没有 `wait-for-ci.sh`，job 会因 `bash: .github/scripts/wait-for-ci.sh: No such file or directory` 失败。
+
+处理：
+
+1. **不要**先在分支保护里加 `pr-status / required`。
+2. 先把 bootstrap PR（含 `pr-status.yml` + `wait-for-ci.sh`）合到 main（其它常规 CI check 通过即可）。
+3. 合并后再到 Settings → Branches → main 配置 `pr-status / required` 为 required。
+4. 之后所有 PR 都会用 main 上的 `wait-for-ci.sh` 跑聚合检查。
+
 ## 排错
 
 - **`release-<cli>` workflow 没触发**：检查 tag 是否以 `<cli>-v` 为前缀；分支保护设的 `release-<cli>.yml` paths 不应阻止；tag 是否成功 `git push origin <tag>`。

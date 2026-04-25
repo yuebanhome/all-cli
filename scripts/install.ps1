@@ -48,7 +48,9 @@ function Resolve-CliVersion {
     Write-Host "Failed to query GitHub API at $api (network error or rate limit): $_" -ForegroundColor Red
     exit 3
   }
-  $tag = $releases | Where-Object { $_.tag_name -like "$Cli-v*" } | Select-Object -First 1 -ExpandProperty tag_name
+  $tag = $releases |
+    Where-Object { $_.tag_name -like "$Cli-v*" -and -not $_.prerelease } |
+    Select-Object -First 1 -ExpandProperty tag_name
   if (-not $tag) { Write-Host "No release tagged $Cli-v* in $Repo" -ForegroundColor Red; exit 3 }
   return $tag.Substring("$Cli-".Length)
 }

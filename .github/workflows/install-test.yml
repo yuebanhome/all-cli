@@ -34,7 +34,7 @@ jobs:
         run: |
           set -euo pipefail
           if ! releases=$(gh api "repos/${{ github.repository }}/releases?per_page=50" \
-                            --jq 'sort_by(.published_at) | reverse | .[].tag_name'); then
+                            --jq 'sort_by(.published_at) | reverse | .[] | select(.prerelease == false) | .tag_name'); then
             echo "::error::gh api releases failed"
             exit 1
           fi
@@ -60,7 +60,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $releases = gh api "repos/${{ github.repository }}/releases?per_page=50" --jq 'sort_by(.published_at) | reverse | .[].tag_name'
+          $releases = gh api "repos/${{ github.repository }}/releases?per_page=50" --jq 'sort_by(.published_at) | reverse | .[] | select(.prerelease == false) | .tag_name'
           if ($LASTEXITCODE -ne 0) { Write-Host "::error::gh api releases failed"; exit 1 }
           $tag = $releases | Where-Object { $_ -match '^sub2api-image-v' } | Select-Object -First 1
           if (-not $tag) { Write-Host "No sub2api-image release yet; skipping."; exit 0 }
