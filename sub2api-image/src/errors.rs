@@ -103,7 +103,8 @@ mod tests {
     fn wrapping_preserves_classification() {
         // 模拟：底层 std::io::Error 作为 source，外层包 AppError::Network。
         let io = std::io::Error::new(std::io::ErrorKind::TimedOut, "boom");
-        let err: anyhow::Error = anyhow::Error::new(io).context(AppError::Network("send failed".into()));
+        let err: anyhow::Error =
+            anyhow::Error::new(io).context(AppError::Network("send failed".into()));
         assert_eq!(exit_code_from(&err), 3);
         let s = format!("{err:#}");
         assert!(s.contains("network error: send failed"));
@@ -112,10 +113,7 @@ mod tests {
 
     #[test]
     fn display_includes_prefix() {
-        assert_eq!(
-            AppError::Config("x".into()).to_string(),
-            "config error: x"
-        );
+        assert_eq!(AppError::Config("x".into()).to_string(), "config error: x");
         assert_eq!(AppError::Api("y".into()).to_string(), "api error: y");
     }
 }

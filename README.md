@@ -23,3 +23,29 @@
 1. 在仓库根目录创建独立子目录。
 2. 在该目录下放置完整的源码、构建配置和 `README.md`。
 3. 在本文件的「CLI 列表」中追加一行，指向新目录。
+
+## 安装（任意 CLI 通用）
+
+预编译二进制发布于本仓库的 GitHub Releases。统一安装入口：
+
+**Linux / macOS：**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/yuebanhome/all-cli/main/scripts/install.sh \
+  | bash -s -- --cli <cli-name>
+```
+
+**Windows（PowerShell）：**
+
+```powershell
+iwr -useb https://raw.githubusercontent.com/yuebanhome/all-cli/main/scripts/install.ps1 -OutFile $env:TEMP\install.ps1
+& $env:TEMP\install.ps1 -Cli <cli-name>
+```
+
+脚本会按本机平台自动选择二进制，并强制 SHA256 校验。详细参数见 [`scripts/install.sh`](./scripts/install.sh) / [`scripts/install.ps1`](./scripts/install.ps1)。
+
+## 发布与版本
+
+每个 CLI 独立版本号，独立打 tag、独立发布 GitHub Release。流程见 [`docs/RELEASING.md`](./docs/RELEASING.md)。
+
+tag 命名约定：`<cli-name>-v<semver>`，例：`sub2api-image-v0.1.0`、`sub2api-image-v0.1.0-rc.1`（带后缀的视为 pre-release，不会被标为 latest）。

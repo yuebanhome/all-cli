@@ -1,0 +1,20 @@
+name: release-sub2api-image
+
+on:
+  push:
+    tags: ["sub2api-image-v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-sub2api-image-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    uses: ./.github/workflows/rust-release.yml
+    with:
+      crate-path: sub2api-image
+      bin-name: sub2api-image
+      tag: ${{ github.ref_name }}

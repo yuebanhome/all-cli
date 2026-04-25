@@ -1,0 +1,69 @@
+name: install-test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/install.sh"
+      - "scripts/install.ps1"
+      - ".github/workflows/install-test.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: install-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unix:
+    name: install-test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-13, macos-14]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe latest sub2api-image release
+        id: probe
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! releases=$(gh api "repos/${{ github.repository }}/releases?per_page=50" \
+                            --jq 'sort_by(.published_at) | reverse | .[] | select(.prerelease == false) | .tag_name'); then
+            echo "::error::gh api releases failed"
+            exit 1
+          fi
+          tag=$(echo "$releases" | grep -E '^sub2api-image-v' | head -1 || true)
+          if [[ -z "$tag" ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "No sub2api-image release yet; skipping."
+          fi
+      - name: Run install.sh
+        if: steps.probe.outputs.skip != 'true'
+        run: bash scripts/install.sh --cli sub2api-image
+      - name: Verify binary
+        if: steps.probe.outputs.skip != 'true'
+        run: "$HOME/.local/bin/sub2api-image --version"
+
+  windows:
+    name: install-test (windows-latest)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe + install
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $releases = gh api "repos/${{ github.repository }}/releases?per_page=50" --jq 'sort_by(.published_at) | reverse | .[] | select(.prerelease == false) | .tag_name'
+          if ($LASTEXITCODE -ne 0) { Write-Host "::error::gh api releases failed"; exit 1 }
+          $tag = $releases | Where-Object { $_ -match '^sub2api-image-v' } | Select-Object -First 1
+          if (-not $tag) { Write-Host "No sub2api-image release yet; skipping."; exit 0 }
+          & .\scripts\install.ps1 -Cli sub2api-image
+          $exe = Join-Path $env:LOCALAPPDATA "Programs\sub2api-image\sub2api-image.exe"
+          & $exe --version

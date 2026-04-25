@@ -147,15 +147,14 @@ pub fn edit(client: &Client, cfg: &EffectiveCfg, log: &Logger) -> Result<ApiResp
 
 fn decode_response(resp: Response, url: &str, t0: Instant, log: &Logger) -> Result<ApiResponse> {
     let status = resp.status();
-    let bytes = resp
-        .bytes()
-        .map_err(|e| anyhow::Error::new(e).context(AppError::Network("reading body failed".into())))?;
+    let bytes = resp.bytes().map_err(|e| {
+        anyhow::Error::new(e).context(AppError::Network("reading body failed".into()))
+    })?;
     log.received(status.as_u16(), t0.elapsed(), bytes.len());
 
     if status.is_success() {
-        let parsed: ApiResponse = serde_json::from_slice(&bytes).map_err(|e| {
-            anyhow::Error::new(e).context(AppError::Parse(format!("from {}", url)))
-        })?;
+        let parsed: ApiResponse = serde_json::from_slice(&bytes)
+            .map_err(|e| anyhow::Error::new(e).context(AppError::Parse(format!("from {}", url))))?;
         log.response_summary(&parsed);
         Ok(parsed)
     } else {

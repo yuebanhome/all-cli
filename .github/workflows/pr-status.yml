@@ -1,0 +1,33 @@
+name: pr-status
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: pr-status-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  required:
+    name: required
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      # Pin checkout to the PR's base SHA (i.e. main) so wait-for-ci.sh always
+      # comes from a trusted source — required-check workflows should never
+      # execute PR-author-controlled code.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+      - name: Wait for per-CLI CI workflows
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OWNER: ${{ github.repository_owner }}
+          REPO:  ${{ github.event.repository.name }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bash .github/scripts/wait-for-ci.sh

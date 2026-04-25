@@ -4,10 +4,28 @@ gpt-image-2 兼容网关的命令行客户端。支持文生图（`/v1/images/ge
 
 ## 安装
 
+**一键安装（Linux / macOS）：**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/yuebanhome/all-cli/main/scripts/install.sh \
+  | bash -s -- --cli sub2api-image
+```
+
+**Windows（PowerShell）：**
+
+```powershell
+iwr -useb https://raw.githubusercontent.com/yuebanhome/all-cli/main/scripts/install.ps1 -OutFile $env:TEMP\install.ps1
+& $env:TEMP\install.ps1 -Cli sub2api-image
+```
+
+**从源码构建：**
+
 ```bash
 cd sub2api-image
 cargo install --path .
 ```
+
+> macOS 用户首次运行如果触发 Gatekeeper：执行 `xattr -d com.apple.quarantine ~/.local/bin/sub2api-image` 即可放行。
 
 ## 配置
 

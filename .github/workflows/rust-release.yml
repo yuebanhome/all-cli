@@ -1,0 +1,183 @@
+name: rust-release
+
+on:
+  workflow_call:
+    inputs:
+      crate-path:
+        type: string
+        required: true
+      bin-name:
+        type: string
+        required: true
+      tag:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.parse.outputs.version }}
+      is_prerelease: ${{ steps.parse.outputs.is_prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: parse
+        name: Parse tag and verify Cargo.toml version
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+          BIN_NAME: ${{ inputs.bin-name }}
+          CRATE_PATH: ${{ inputs.crate-path }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$TAG" =~ ^(.+)-v(.+)$ ]]; then
+            echo "::error::Tag '$TAG' does not match <name>-v<version>"
+            exit 1
+          fi
+          parsed_name="${BASH_REMATCH[1]}"
+          parsed_version="${BASH_REMATCH[2]}"
+          if [[ "$parsed_name" != "$BIN_NAME" ]]; then
+            echo "::error::Tag name '$parsed_name' != bin-name '$BIN_NAME'"
+            exit 1
+          fi
+          cargo_version=$(awk '
+            /^\[/ { in_pkg = ($0 == "[package]") }
+            in_pkg && /^version[[:space:]]*=/ && match($0, /"[^"]+"/) {
+              print substr($0, RSTART+1, RLENGTH-2); exit
+            }
+          ' "$CRATE_PATH/Cargo.toml")
+          if [[ -z "$cargo_version" ]]; then
+            echo "::error::Could not find [package].version in $CRATE_PATH/Cargo.toml"
+            exit 1
+          fi
+          if [[ "$cargo_version" != "$parsed_version" ]]; then
+            echo "::error::Cargo.toml version '$cargo_version' != tag version '$parsed_version'"
+            exit 1
+          fi
+          echo "version=$parsed_version" >> "$GITHUB_OUTPUT"
+          if [[ "$parsed_version" == *-* ]]; then
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: build (${{ matrix.target }})
+    needs: verify
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+            ext: tar.gz
+          - target: x86_64-unknown-linux-musl
+            runner: ubuntu-latest
+            apt: musl-tools
+            ext: tar.gz
+          - target: aarch64-unknown-linux-musl
+            runner: ubuntu-24.04-arm
+            apt: musl-tools
+            ext: tar.gz
+          - target: x86_64-apple-darwin
+            runner: macos-13
+            ext: tar.gz
+          - target: aarch64-apple-darwin
+            runner: macos-14
+            ext: tar.gz
+          - target: x86_64-pc-windows-msvc
+            runner: windows-latest
+            ext: zip
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install musl-tools
+        if: matrix.apt
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ${{ matrix.apt }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ inputs.crate-path }}
+          key: release-${{ matrix.target }}
+      - name: cargo build --release
+        working-directory: ${{ inputs.crate-path }}
+        run: cargo build --release --target ${{ matrix.target }}
+      - name: Package (Unix)
+        if: matrix.ext == 'tar.gz'
+        shell: bash
+        env:
+          BIN: ${{ inputs.bin-name }}
+          TAG: ${{ inputs.tag }}
+          TARGET: ${{ matrix.target }}
+          CRATE: ${{ inputs.crate-path }}
+        run: |
+          set -euo pipefail
+          archive="${TAG}-${TARGET}.tar.gz"
+          src_dir="${CRATE}/target/${TARGET}/release"
+          src="${src_dir}/${BIN}"
+          if command -v strip >/dev/null 2>&1; then strip "$src" || true; fi
+          tar -C "$src_dir" -czf "$archive" "$BIN"
+          echo "ARCHIVE=$archive" >> "$GITHUB_ENV"
+      - name: Package (Windows)
+        if: matrix.ext == 'zip'
+        shell: pwsh
+        env:
+          BIN: ${{ inputs.bin-name }}
+          TAG: ${{ inputs.tag }}
+          TARGET: ${{ matrix.target }}
+          CRATE: ${{ inputs.crate-path }}
+        run: |
+          $archive = "$env:TAG-$env:TARGET.zip"
+          $src = Join-Path "$env:CRATE/target/$env:TARGET/release" "$env:BIN.exe"
+          Compress-Archive -Path $src -DestinationPath $archive -Force
+          "ARCHIVE=$archive" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARCHIVE }}
+          path: ${{ env.ARCHIVE }}
+          retention-days: 1
+          if-no-files-found: error
+
+  publish:
+    name: publish
+    needs: [verify, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Generate SHA256SUMS
+        working-directory: dist
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=( *.tar.gz *.zip )
+          if (( ${#files[@]} == 0 )); then
+            echo "::error::No archives found in dist/"
+            exit 1
+          fi
+          sha256sum "${files[@]}" > SHA256SUMS
+          cat SHA256SUMS
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          name: ${{ inputs.tag }}
+          fail_on_unmatched_files: true
+          prerelease: ${{ needs.verify.outputs.is_prerelease == 'true' }}
+          make_latest: ${{ needs.verify.outputs.is_prerelease == 'false' }}
+          files: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/SHA256SUMS

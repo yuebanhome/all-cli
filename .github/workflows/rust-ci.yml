@@ -1,0 +1,101 @@
+name: rust-ci
+
+on:
+  workflow_call:
+    inputs:
+      crate-path:
+        description: "Path to the crate (relative to repo root)"
+        type: string
+        required: true
+      rust-toolchain:
+        description: "Rust toolchain"
+        type: string
+        default: stable
+
+permissions:
+  contents: read
+
+jobs:
+  fmt:
+    name: fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ inputs.rust-toolchain }}
+          components: rustfmt
+      - name: cargo fmt --check
+        working-directory: ${{ inputs.crate-path }}
+        run: cargo fmt --all --check
+
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ inputs.rust-toolchain }}
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ inputs.crate-path }}
+          key: clippy
+      - name: cargo clippy
+        working-directory: ${{ inputs.crate-path }}
+        run: cargo clippy --all-targets -- -D warnings
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ inputs.rust-toolchain }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ inputs.crate-path }}
+          key: test
+      - name: cargo test
+        working-directory: ${{ inputs.crate-path }}
+        run: cargo test
+
+  build-smoke:
+    name: build-smoke (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+          - target: x86_64-unknown-linux-musl
+            runner: ubuntu-latest
+            apt: musl-tools
+          - target: aarch64-unknown-linux-musl
+            runner: ubuntu-24.04-arm
+            apt: musl-tools
+          - target: x86_64-apple-darwin
+            runner: macos-13
+          - target: aarch64-apple-darwin
+            runner: macos-14
+          - target: x86_64-pc-windows-msvc
+            runner: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install musl-tools
+        if: matrix.apt
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ${{ matrix.apt }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ inputs.rust-toolchain }}
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ inputs.crate-path }}
+          key: build-smoke-${{ matrix.target }}
+      - name: cargo build --release
+        working-directory: ${{ inputs.crate-path }}
+        run: cargo build --release --target ${{ matrix.target }}
