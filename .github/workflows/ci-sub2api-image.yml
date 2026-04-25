@@ -1,0 +1,23 @@
+name: ci-sub2api-image
+
+on:
+  pull_request:
+    paths:
+      - "sub2api-image/**"
+      - ".github/workflows/rust-ci.yml"
+      - ".github/workflows/ci-sub2api-image.yml"
+  push:
+    branches: [main]
+    paths:
+      - "sub2api-image/**"
+      - ".github/workflows/rust-ci.yml"
+      - ".github/workflows/ci-sub2api-image.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/rust-ci.yml
+    with:
+      crate-path: sub2api-image
