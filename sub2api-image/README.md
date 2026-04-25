@@ -25,7 +25,7 @@ cd sub2api-image
 cargo install --path .
 ```
 
-> macOS Apple Silicon 用户首次运行如果触发 Gatekeeper：执行 `xattr -d com.apple.quarantine ~/.local/bin/sub2api-image` 即可放行。
+> macOS 用户首次运行如果触发 Gatekeeper：执行 `xattr -d com.apple.quarantine ~/.local/bin/sub2api-image` 即可放行。
 
 ## 配置
 

@@ -11,7 +11,7 @@
 - `sub2api-image-v0.1.0`（正式版）
 - `sub2api-image-v0.2.0-rc.1`（pre-release，自动标识为 pre-release，不会顶替 "Latest" 指针）
 
-`<semver>` 中如包含 `-`（除前缀 `v` 之外），release workflow 会把它判为 pre-release。
+若 `<semver>` 自身包含 `-`（即在主版本号之后还有破折号，如 `0.2.0-rc.1`），release workflow 会把它判为 pre-release。
 
 ## 发布步骤（以 sub2api-image 为例）
 
@@ -76,7 +76,7 @@ git push origin :refs/tags/sub2api-image-v0.1.0
 4. 在根目录 `README.md` 的 CLI 列表里追加一行。
 5. tag 用 `xtool-v0.1.0` 即可触发首次发布。
 6. 安装脚本不需要改：`bash install.sh --cli xtool` 直接可用。
-7. `pr-status.yml` / `wait-for-ci.sh` 也不需要改：聚合器通过 `gh api` 动态发现所有 `ci-*` workflow。
+7. `pr-status.yml` / `.github/scripts/wait-for-ci.sh` 也不需要改：聚合器通过 `gh api` 动态发现所有 `ci-*` workflow。
 
 非 Rust CLI（Go / Node / ...）：新增 `<lang>-ci.yml` / `<lang>-release.yml` 两个 reusable workflow（按 `rust-ci.yml` / `rust-release.yml` 的模板写），per-CLI 触发文件继续保持薄壳。安装脚本完全语言无关，不需要任何改动 —— 只要新 CLI 遵循同样的产物命名约定（`<cli>-v<ver>-<triple>.<ext>` + `SHA256SUMS`）。
 
