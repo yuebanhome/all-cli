@@ -30,14 +30,13 @@
 
 3. GitHub Actions `release-sub2api-image` 触发，依次：
    - **`verify`**：解析 tag，校验 tag 名前缀与 `Cargo.toml` 的 `[package].version` 一致；不一致 → 全流程 fail，不构建任何东西
-   - **`build` (matrix×6)**：6 个 target triple 各自构建并打包成 `tar.gz` / `zip`
+   - **`build` (matrix×5)**：5 个 target triple 各自构建并打包成 `tar.gz` / `zip`
    - **`publish`**：汇总产物，生成 `SHA256SUMS`，调用 `softprops/action-gh-release@v2` 创建 Release 并上传
 
-4. Release 页面应出现 6 个 archive + 一个 `SHA256SUMS`，例如：
+4. Release 页面应出现 5 个 archive + 一个 `SHA256SUMS`，例如：
    - `sub2api-image-v0.1.0-x86_64-unknown-linux-gnu.tar.gz`
    - `sub2api-image-v0.1.0-x86_64-unknown-linux-musl.tar.gz`
    - `sub2api-image-v0.1.0-aarch64-unknown-linux-musl.tar.gz`
-   - `sub2api-image-v0.1.0-x86_64-apple-darwin.tar.gz`
    - `sub2api-image-v0.1.0-aarch64-apple-darwin.tar.gz`
    - `sub2api-image-v0.1.0-x86_64-pc-windows-msvc.zip`
    - `SHA256SUMS`
