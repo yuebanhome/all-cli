@@ -7,14 +7,13 @@ on:
         description: "Path to the crate (relative to repo root)"
         type: string
         required: true
-      bin-name:
-        description: "Binary name (matches [package].name)"
-        type: string
-        required: true
       rust-toolchain:
         description: "Rust toolchain"
         type: string
         default: stable
+
+permissions:
+  contents: read
 
 jobs:
   fmt:
@@ -88,7 +87,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install musl-tools
         if: matrix.apt
-        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.apt }}
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ${{ matrix.apt }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ inputs.rust-toolchain }}
