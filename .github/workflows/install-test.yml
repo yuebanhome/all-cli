@@ -12,6 +12,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: install-test-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   unix:
     name: install-test (${{ matrix.os }})
@@ -29,9 +33,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tag=$(gh api "repos/${{ github.repository }}/releases?per_page=50" \
-                  --jq '.[].tag_name' \
-                | grep -E '^sub2api-image-v' | head -1 || true)
+          if ! releases=$(gh api "repos/${{ github.repository }}/releases?per_page=50" \
+                            --jq 'sort_by(.published_at) | reverse | .[].tag_name'); then
+            echo "::error::gh api releases failed"
+            exit 1
+          fi
+          tag=$(echo "$releases" | grep -E '^sub2api-image-v' | head -1 || true)
           if [[ -z "$tag" ]]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "No sub2api-image release yet; skipping."
@@ -53,7 +60,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = (gh api "repos/${{ github.repository }}/releases?per_page=50" --jq '.[].tag_name' | Select-String -Pattern '^sub2api-image-v' | Select-Object -First 1)
+          $releases = gh api "repos/${{ github.repository }}/releases?per_page=50" --jq 'sort_by(.published_at) | reverse | .[].tag_name'
+          if ($LASTEXITCODE -ne 0) { Write-Host "::error::gh api releases failed"; exit 1 }
+          $tag = $releases | Where-Object { $_ -match '^sub2api-image-v' } | Select-Object -First 1
           if (-not $tag) { Write-Host "No sub2api-image release yet; skipping."; exit 0 }
           & .\scripts\install.ps1 -Cli sub2api-image
           $exe = Join-Path $env:LOCALAPPDATA "Programs\sub2api-image\sub2api-image.exe"
