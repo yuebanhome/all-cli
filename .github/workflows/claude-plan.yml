@@ -1,0 +1,45 @@
+name: Claude Code (Plan Mode)
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened, assigned]
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  claude-plan:
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude_plan')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude_plan')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude_plan')) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude_plan') || contains(github.event.issue.title, '@claude_plan')))
+    runs-on: ubuntu-latest
+    environment: CLAUDE
+    env:
+      ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code (Plan Mode)
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          trigger_phrase: '@claude_plan'
+          claude_args: |
+            --permission-mode plan
+            --allowedTools "Read,Glob,Grep,LS,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(gh pr view:*),Bash(gh pr list:*)"
+            --system-prompt "You are in PLAN MODE. Your job is to explore the codebase thoroughly and produce a detailed implementation plan — do NOT make any file edits. Your plan must include: 1) Summary of what is being requested, 2) Files to modify and why, 3) Specific changes for each file, 4) Any questions or concerns. Present the plan as a clear, numbered comment. Once the user is satisfied, they can type '@claude' to trigger the implementation workflow."
