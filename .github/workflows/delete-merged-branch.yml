@@ -1,0 +1,44 @@
+name: Delete merged branch
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  delete-branch:
+    # Only run when the PR was actually merged, and the head branch lives in this repo
+    # (cross-fork PRs cannot be deleted via this token anyway).
+    if: >-
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete head branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          REPO: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+
+          # Protect common long-lived branches even if someone accidentally opens a PR from them.
+          case "$HEAD_REF" in
+            "$DEFAULT_BRANCH"|main|master|develop|dev|release/*|hotfix/*)
+              echo "Skip protected branch: $HEAD_REF"
+              exit 0
+              ;;
+          esac
+
+          echo "Deleting branch '$HEAD_REF' from '$REPO'"
+          if gh api --method DELETE "repos/$REPO/git/refs/heads/$HEAD_REF" --silent; then
+            echo "Deleted: $HEAD_REF"
+          else
+            status=$?
+            # 422 = ref doesn't exist (already deleted). Treat as success.
+            echo "Delete returned non-zero exit ($status); branch may already be gone."
+            exit 0
+          fi
