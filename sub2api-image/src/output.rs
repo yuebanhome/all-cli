@@ -1,27 +1,43 @@
 use crate::api::ApiResponse;
-use anyhow::{bail, Context, Result};
+use crate::errors::AppError;
+use anyhow::Result;
 use base64::Engine;
 use std::path::Path;
 
 pub fn save_first_image(resp: &ApiResponse, out: &Path) -> Result<()> {
     if resp.data.is_empty() {
-        bail!("response parse error: data is empty");
+        return Err(AppError::Parse("data is empty".into()).into());
     }
     let first = &resp.data[0];
     let b64 = match &first.b64_json {
         Some(b) => b,
         None => {
             if first.url.is_some() {
-                bail!("response parse error: server returned URL mode, this version does not support downloading URL responses");
+                return Err(AppError::Parse(
+                    "server returned URL mode, this version does not support downloading URL responses"
+                        .into(),
+                )
+                .into());
             }
-            bail!("response parse error: data[0] has neither b64_json nor url");
+            return Err(AppError::Parse("data[0] has neither b64_json nor url".into()).into());
         }
     };
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(b64)
-        .context("response parse error: base64 decode failed")?;
+        .map_err(|e| AppError::Parse(format!("base64 decode failed: {}", e)))?;
+    if let Some(parent) = out.parent() {
+        if !parent.as_os_str().is_empty() && !parent.exists() {
+            std::fs::create_dir_all(parent).map_err(|e| {
+                AppError::Io(format!(
+                    "cannot create output dir {}: {}",
+                    parent.display(),
+                    e
+                ))
+            })?;
+        }
+    }
     std::fs::write(out, &bytes)
-        .with_context(|| format!("io error: cannot write {}", out.display()))?;
+        .map_err(|e| AppError::Io(format!("cannot write {}: {}", out.display(), e)))?;
     Ok(())
 }
 
@@ -29,6 +45,7 @@ pub fn save_first_image(resp: &ApiResponse, out: &Path) -> Result<()> {
 mod tests {
     use super::*;
     use crate::api::ImageData;
+    use crate::errors::exit_code_from;
     use base64::Engine;
     use tempfile::TempDir;
 
@@ -62,11 +79,25 @@ mod tests {
     }
 
     #[test]
+    fn creates_missing_parent_directory() {
+        let b64 = base64::engine::general_purpose::STANDARD.encode(PNG_1X1);
+        let resp = resp_with(vec![ImageData {
+            b64_json: Some(b64),
+            url: None,
+            revised_prompt: None,
+        }]);
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("a").join("b").join("c").join("out.png");
+        save_first_image(&resp, &path).unwrap();
+        assert!(path.exists());
+    }
+
+    #[test]
     fn empty_data_errors() {
         let resp = resp_with(vec![]);
         let dir = TempDir::new().unwrap();
         let err = save_first_image(&resp, &dir.path().join("x.png")).unwrap_err();
-        assert!(err.to_string().contains("response parse error"));
+        assert_eq!(exit_code_from(&err), 5);
         assert!(err.to_string().contains("data is empty"));
     }
 
@@ -79,6 +110,7 @@ mod tests {
         }]);
         let dir = TempDir::new().unwrap();
         let err = save_first_image(&resp, &dir.path().join("x.png")).unwrap_err();
+        assert_eq!(exit_code_from(&err), 5);
         assert!(err.to_string().contains("URL mode"));
     }
 
@@ -91,6 +123,7 @@ mod tests {
         }]);
         let dir = TempDir::new().unwrap();
         let err = save_first_image(&resp, &dir.path().join("x.png")).unwrap_err();
+        assert_eq!(exit_code_from(&err), 5);
         assert!(err.to_string().contains("neither b64_json nor url"));
     }
 
@@ -103,6 +136,7 @@ mod tests {
         }]);
         let dir = TempDir::new().unwrap();
         let err = save_first_image(&resp, &dir.path().join("x.png")).unwrap_err();
+        assert_eq!(exit_code_from(&err), 5);
         assert!(err.to_string().contains("base64 decode"));
     }
 }

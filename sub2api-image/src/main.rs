@@ -42,7 +42,11 @@ fn run(args: &cli::Args) -> anyhow::Result<()> {
             .clone()
             .or(cfg.defaults.model)
             .unwrap_or_else(|| "gpt-image-2".into()),
-        size: cfg.defaults.size.unwrap_or_else(|| "auto".into()),
+        size: args
+            .size
+            .clone()
+            .or(cfg.defaults.size)
+            .unwrap_or_else(|| "auto".into()),
         quality: args
             .quality
             .clone()

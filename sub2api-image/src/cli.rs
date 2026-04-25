@@ -1,4 +1,5 @@
-use anyhow::{bail, Result};
+use crate::errors::AppError;
+use anyhow::Result;
 use clap::Parser;
 use std::path::PathBuf;
 
@@ -25,6 +26,10 @@ pub struct Args {
     #[arg(long)]
     pub quality: Option<String>,
 
+    /// 图像尺寸（如 1024x1024 / auto），覆盖配置默认
+    #[arg(long)]
+    pub size: Option<String>,
+
     /// 覆盖默认 model
     #[arg(long)]
     pub model: Option<String>,
@@ -32,7 +37,7 @@ pub struct Args {
     /// 写入配置模板后退出
     #[arg(
         long,
-        conflicts_with_all = ["prompt", "output", "image", "mask", "quality", "model"]
+        conflicts_with_all = ["prompt", "output", "image", "mask", "quality", "size", "model"]
     )]
     pub init: bool,
 
@@ -47,25 +52,27 @@ impl Args {
             return Ok(());
         }
         if self.prompt.is_none() {
-            bail!("input error: --prompt is required");
+            return Err(AppError::Input("--prompt is required".into()).into());
         }
         if self.output.is_none() {
-            bail!("input error: --output is required");
+            return Err(AppError::Input("--output is required".into()).into());
         }
         if let Some(img) = &self.image {
             if !img.exists() {
-                bail!(
-                    "input error: --image file does not exist: {}",
+                return Err(AppError::Input(format!(
+                    "--image file does not exist: {}",
                     img.display()
-                );
+                ))
+                .into());
             }
         }
         if let Some(mask) = &self.mask {
             if !mask.exists() {
-                bail!(
-                    "input error: --mask file does not exist: {}",
+                return Err(AppError::Input(format!(
+                    "--mask file does not exist: {}",
                     mask.display()
-                );
+                ))
+                .into());
             }
         }
         Ok(())
@@ -75,6 +82,7 @@ impl Args {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::errors::exit_code_from;
 
     fn args_from(parts: &[&str]) -> Args {
         let mut full = vec!["sub2api-image"];
@@ -95,9 +103,16 @@ mod tests {
     }
 
     #[test]
+    fn init_with_size_is_rejected_by_clap() {
+        let r = Args::try_parse_from(["sub2api-image", "--init", "--size", "1024x1024"]);
+        assert!(r.is_err(), "clap should reject --init with --size");
+    }
+
+    #[test]
     fn missing_prompt_fails_validate() {
         let a = args_from(&["-o", "/tmp/x.png"]);
         let err = a.validate().unwrap_err();
+        assert_eq!(exit_code_from(&err), 2);
         assert!(err.to_string().contains("--prompt is required"));
     }
 
@@ -105,6 +120,7 @@ mod tests {
     fn missing_output_fails_validate() {
         let a = args_from(&["--prompt", "x"]);
         let err = a.validate().unwrap_err();
+        assert_eq!(exit_code_from(&err), 2);
         assert!(err.to_string().contains("--output is required"));
     }
 
@@ -133,6 +149,7 @@ mod tests {
             "/nonexistent-path-xxx.png",
         ]);
         let err = a.validate().unwrap_err();
+        assert_eq!(exit_code_from(&err), 2);
         assert!(err.to_string().contains("--image file does not exist"));
     }
 
@@ -140,5 +157,11 @@ mod tests {
     fn happy_path_generate_validates() {
         let a = args_from(&["--prompt", "hello", "-o", "/tmp/out.png"]);
         a.validate().unwrap();
+    }
+
+    #[test]
+    fn size_flag_is_parsed() {
+        let a = args_from(&["--prompt", "x", "-o", "/tmp/x.png", "--size", "1024x1024"]);
+        assert_eq!(a.size.as_deref(), Some("1024x1024"));
     }
 }

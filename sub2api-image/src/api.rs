@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+use crate::errors::AppError;
 use crate::logging::Logger;
-use anyhow::{bail, Context, Result};
+use anyhow::Result;
 use reqwest::blocking::{Client, Response};
 use std::time::Instant;
 
@@ -93,7 +94,7 @@ pub fn generate(client: &Client, cfg: &EffectiveCfg, log: &Logger) -> Result<Api
         .bearer_auth(&cfg.api_key)
         .json(&req)
         .send()
-        .map_err(|e| anyhow::anyhow!("network error: {}", e))?;
+        .map_err(|e| anyhow::Error::new(e).context(AppError::Network("send failed".into())))?;
     decode_response(resp, &url, t0, log)
 }
 
@@ -104,7 +105,7 @@ pub fn edit(client: &Client, cfg: &EffectiveCfg, log: &Logger) -> Result<ApiResp
     let image = cfg
         .image
         .as_ref()
-        .ok_or_else(|| anyhow::anyhow!("input error: --image required for edit"))?;
+        .ok_or_else(|| AppError::Input("--image required for edit".into()))?;
 
     let mut form = multipart::Form::new()
         .text("prompt", cfg.prompt.clone())
@@ -113,11 +114,11 @@ pub fn edit(client: &Client, cfg: &EffectiveCfg, log: &Logger) -> Result<ApiResp
         .text("quality", cfg.quality.clone())
         .text("size", cfg.size.clone())
         .file("image", image)
-        .with_context(|| format!("io error: cannot read image {}", image.display()))?;
+        .map_err(|e| AppError::Io(format!("cannot read image {}: {}", image.display(), e)))?;
     if let Some(mask) = &cfg.mask {
         form = form
             .file("mask", mask)
-            .with_context(|| format!("io error: cannot read mask {}", mask.display()))?;
+            .map_err(|e| AppError::Io(format!("cannot read mask {}: {}", mask.display(), e)))?;
     }
 
     log.endpoint("POST", &url);
@@ -140,7 +141,7 @@ pub fn edit(client: &Client, cfg: &EffectiveCfg, log: &Logger) -> Result<ApiResp
         .bearer_auth(&cfg.api_key)
         .multipart(form)
         .send()
-        .map_err(|e| anyhow::anyhow!("network error: {}", e))?;
+        .map_err(|e| anyhow::Error::new(e).context(AppError::Network("send failed".into())))?;
     decode_response(resp, &url, t0, log)
 }
 
@@ -148,12 +149,13 @@ fn decode_response(resp: Response, url: &str, t0: Instant, log: &Logger) -> Resu
     let status = resp.status();
     let bytes = resp
         .bytes()
-        .map_err(|e| anyhow::anyhow!("network error reading body: {}", e))?;
+        .map_err(|e| anyhow::Error::new(e).context(AppError::Network("reading body failed".into())))?;
     log.received(status.as_u16(), t0.elapsed(), bytes.len());
 
     if status.is_success() {
-        let parsed: ApiResponse = serde_json::from_slice(&bytes)
-            .with_context(|| format!("response parse error from {}", url))?;
+        let parsed: ApiResponse = serde_json::from_slice(&bytes).map_err(|e| {
+            anyhow::Error::new(e).context(AppError::Parse(format!("from {}", url)))
+        })?;
         log.response_summary(&parsed);
         Ok(parsed)
     } else {
@@ -174,7 +176,7 @@ fn decode_response(resp: Response, url: &str, t0: Instant, log: &Logger) -> Resu
                 url,
             ),
         };
-        bail!("api error: {}", msg)
+        Err(AppError::Api(msg).into())
     }
 }
 

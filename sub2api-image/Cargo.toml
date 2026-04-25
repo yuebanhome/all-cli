@@ -3,6 +3,11 @@ name = "sub2api-image"
 version = "0.1.0"
 edition = "2021"
 description = "CLI for gpt-image-2 compatible image generation/edit API"
+license = "MIT"
+repository = "https://github.com/yuebanhome/all-cli"
+readme = "README.md"
+keywords = ["cli", "image", "ai", "openai", "gpt-image"]
+categories = ["command-line-utilities", "multimedia::images"]
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }

@@ -59,6 +59,7 @@ sub2api-image --image origin.png --mask mask.png \
 | `--image <PATH>` | 传入则切换为 edit 模式 |
 | `--mask <PATH>` | 遮罩图（仅 edit；alpha=0 区域被重绘） |
 | `--quality <Q>` | auto \| high \| medium \| low |
+| `--size <SIZE>` | 图像尺寸（如 `1024x1024` / `auto`），覆盖配置默认 |
 | `--model <NAME>` | 覆盖默认 model |
 | `--init` | 写配置模板后退出 |
 | `--quiet` | 关闭 stderr 调试日志 |
