@@ -80,8 +80,12 @@ resolve_version() {
     echo "$VERSION"; return
   fi
   local api="https://api.github.com/repos/${REPO}/releases?per_page=100"
-  local tag
-  tag=$(_dl_out "$api" \
+  local body tag
+  if ! body=$(_dl_out "$api"); then
+    echo "Failed to query GitHub API at ${api} (network error or rate limit)" >&2
+    exit 3
+  fi
+  tag=$(printf '%s' "$body" \
     | grep -o '"tag_name": *"[^"]*"' \
     | sed 's/"tag_name": *"\(.*\)"/\1/' \
     | grep "^${CLI_NAME}-v" \
@@ -93,7 +97,7 @@ resolve_version() {
 }
 
 main() {
-  local target version archive url sums_url tmp expected actual line
+  local target version archive url sums_url tmp expected actual
   target=$(detect_target)
   version=$(resolve_version)
   case "$version" in v*) ;; *) version="v${version}" ;; esac
@@ -119,11 +123,10 @@ main() {
   echo "Downloading SHA256SUMS..."
   _dl "$sums_url" "$tmp/SHA256SUMS" || { echo "Download failed: $sums_url" >&2; exit 3; }
 
-  line=$(grep "  ${archive}\$" "$tmp/SHA256SUMS" || true)
-  if [[ -z "$line" ]]; then
+  expected=$(awk -v a="$archive" '$2 == a { print $1; exit }' "$tmp/SHA256SUMS")
+  if [[ -z "$expected" ]]; then
     echo "SHA256SUMS missing entry for ${archive}" >&2; exit 4
   fi
-  expected=$(echo "$line" | awk '{print $1}')
   actual=$(_sha "$tmp/$archive")
   if [[ "$expected" != "$actual" ]]; then
     echo "SHA256 mismatch for ${archive}" >&2
