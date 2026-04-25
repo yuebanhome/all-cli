@@ -121,7 +121,7 @@ main() {
     echo "(dry run, not downloading)"; return 0
   fi
 
-  tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+  tmp=$(mktemp -d); trap "rm -rf '$tmp'" EXIT
 
   echo "Downloading archive..."
   _dl "$url" "$tmp/$archive" || { echo "Download failed: $url" >&2; exit 3; }
