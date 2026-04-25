@@ -68,6 +68,8 @@ Write-Host "Target    : $target"
 Write-Host "Archive   : $url"
 Write-Host "InstallTo : $InstallDir"
 
+# `return` (not `exit`) so a future edit that puts cleanup-required state above this point is
+# protected by the try/finally. Currently this fires before $tmp is created, so no cleanup is needed.
 if ($DryRun) { Write-Host "(dry run, not downloading)"; return }
 
 $tmp = New-Item -ItemType Directory -Path (Join-Path $env:TEMP ([guid]::NewGuid())) -Force
@@ -105,14 +107,25 @@ try {
   Write-Host "Installed: $(Join-Path $InstallDir $exe)"
 
   $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
-  $onPath = ($userPath -split ';' | Where-Object { $_ -ieq $InstallDir })
+  if (-not $userPath) { $userPath = '' }
+  $normalized = $InstallDir.TrimEnd('\','/')
+  $onPath = ($userPath -split ';' | ForEach-Object { $_.TrimEnd('\','/') } | Where-Object { $_ -ieq $normalized })
   if (-not $onPath) {
     Write-Host ""
-    Write-Host "Note: $InstallDir is not on PATH. Add it via:"
-    Write-Host "  setx PATH `"%PATH%;$InstallDir`""
+    Write-Host "Note: $InstallDir is not on PATH. To add it permanently (current user), run in PowerShell:"
+    $cmd = "[Environment]::SetEnvironmentVariable('Path', ([Environment]::GetEnvironmentVariable('Path','User').TrimEnd(';') + ';" + $InstallDir + "'), 'User')"
+    Write-Host "  $cmd"
+    Write-Host "Then open a new shell."
   }
 
-  & (Join-Path $InstallDir $exe) --version
+  try {
+    & (Join-Path $InstallDir $exe) --version
+  } catch {
+    Write-Host ""
+    Write-Host "Note: $exe is installed but '--version' failed: $_" -ForegroundColor Yellow
+    Write-Host "Possible causes: missing VC++ redistributable, AV quarantine, or a corrupt build."
+    exit 1
+  }
 } finally {
   Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
 }
