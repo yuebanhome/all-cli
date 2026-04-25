@@ -302,12 +302,7 @@ api_key  = "test-key"
     });
 
     // 三层不存在的目录，CLI 应当自动建出来
-    let out_path = tmp
-        .path()
-        .join("a")
-        .join("b")
-        .join("c")
-        .join("out.png");
+    let out_path = tmp.path().join("a").join("b").join("c").join("out.png");
     Command::cargo_bin("sub2api-image")
         .unwrap()
         .env("SUB2API_IMAGE_CONFIG", &config_path)

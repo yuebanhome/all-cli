@@ -68,9 +68,8 @@ pub fn load() -> Result<Config> {
             e
         ))
     })?;
-    let cfg: Config = toml::from_str(&s).map_err(|e| {
-        AppError::Config(format!("cannot parse TOML at {}: {}", path.display(), e))
-    })?;
+    let cfg: Config = toml::from_str(&s)
+        .map_err(|e| AppError::Config(format!("cannot parse TOML at {}: {}", path.display(), e)))?;
     if cfg.base_url.trim().is_empty() {
         return Err(AppError::Config("base_url is required".into()).into());
     }
@@ -102,7 +101,11 @@ pub fn write_template() -> Result<PathBuf> {
     if let Some(parent) = path.parent() {
         let parent_existed_before = parent.exists();
         std::fs::create_dir_all(parent).map_err(|e| {
-            AppError::Io(format!("cannot create config dir {}: {}", parent.display(), e))
+            AppError::Io(format!(
+                "cannot create config dir {}: {}",
+                parent.display(),
+                e
+            ))
         })?;
         // 只在"本次由我们新建"的目录上收紧到 0700，避免误改用户已有的目录（如 /tmp）
         #[cfg(unix)]
@@ -227,7 +230,9 @@ mod tests {
         env::remove_var("HOME");
         env::set_var("USERPROFILE", "C:\\Users\\me");
         let p = resolve_config_path().unwrap();
-        assert!(p.ends_with(".sub2api-image/config.toml") || p.ends_with(".sub2api-image\\config.toml"));
+        assert!(
+            p.ends_with(".sub2api-image/config.toml") || p.ends_with(".sub2api-image\\config.toml")
+        );
     }
 
     #[test]
