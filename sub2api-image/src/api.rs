@@ -180,10 +180,16 @@ fn decode_response(resp: Response, url: &str, t0: Instant, log: &Logger) -> Resu
 
 fn truncate(s: &str, max: usize) -> String {
     if s.len() <= max {
-        s.to_string()
-    } else {
-        format!("{}...(truncated)", &s[..max])
+        return s.to_string();
     }
+    // 在字符边界处截断，避免落到多字节 UTF-8 字符中间触发 panic
+    let cut = s
+        .char_indices()
+        .map(|(i, _)| i)
+        .take_while(|&i| i <= max)
+        .last()
+        .unwrap_or(0);
+    format!("{}...(truncated)", &s[..cut])
 }
 
 #[cfg(test)]
@@ -275,5 +281,16 @@ mod tests {
         assert_eq!(r.len(), 10 + "...(truncated)".len());
         assert!(r.starts_with("aaaaaaaaaa"));
         assert!(r.ends_with("(truncated)"));
+    }
+
+    #[test]
+    fn truncate_does_not_panic_on_multibyte_boundary() {
+        // "你好" = 6 bytes (3 bytes per char). max=4 lands inside "好";
+        // 朴素 &s[..4] 会 panic，必须回退到上一个字符边界。
+        let s = "你好世界";
+        let r = truncate(s, 4);
+        assert!(r.ends_with("(truncated)"));
+        // 前 3 字节是"你"
+        assert!(r.starts_with("你"));
     }
 }

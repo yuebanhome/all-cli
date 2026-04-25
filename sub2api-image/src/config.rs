@@ -80,9 +80,11 @@ pub fn write_template() -> Result<std::path::PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
 
-    // 测试环境变量优先级。注意：env 测试默认串行跑（单进程全局状态）。
+    // env 测试操作全局状态，必须串行执行；用 serial_test 强制保证。
     #[test]
+    #[serial]
     fn explicit_config_env_wins() {
         // 保存原值
         let saved_cfg = env::var("SUB2API_IMAGE_CONFIG").ok();
@@ -104,6 +106,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn home_env_used_when_no_explicit_config() {
         let saved_cfg = env::var("SUB2API_IMAGE_CONFIG").ok();
         let saved_home = env::var("SUB2API_IMAGE_HOME").ok();
@@ -159,6 +162,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn load_full_config_ok() {
         let dir = TempDir::new().unwrap();
         std::fs::write(
@@ -182,6 +186,7 @@ quality = "high"
     }
 
     #[test]
+    #[serial]
     fn load_without_defaults_ok() {
         let dir = TempDir::new().unwrap();
         std::fs::write(
@@ -197,6 +202,7 @@ api_key = "sk-abc"
     }
 
     #[test]
+    #[serial]
     fn load_missing_api_key_errors() {
         let dir = TempDir::new().unwrap();
         std::fs::write(
@@ -213,6 +219,7 @@ api_key = ""
     }
 
     #[test]
+    #[serial]
     fn load_missing_file_errors() {
         let dir = TempDir::new().unwrap();
         let _g = isolate_env(dir.path());
@@ -221,6 +228,7 @@ api_key = ""
     }
 
     #[test]
+    #[serial]
     fn load_bad_toml_errors() {
         let dir = TempDir::new().unwrap();
         std::fs::write(dir.path().join("config.toml"), r#"not valid toml ][["#).unwrap();
@@ -230,6 +238,7 @@ api_key = ""
     }
 
     #[test]
+    #[serial]
     fn write_template_creates_file() {
         let dir = TempDir::new().unwrap();
         let _g = isolate_env(dir.path());
@@ -240,6 +249,7 @@ api_key = ""
     }
 
     #[test]
+    #[serial]
     fn write_template_refuses_overwrite() {
         let dir = TempDir::new().unwrap();
         std::fs::create_dir_all(dir.path()).unwrap();
@@ -250,6 +260,7 @@ api_key = ""
     }
 
     #[test]
+    #[serial]
     fn template_roundtrip_parses() {
         // 模板内容应能被 TOML 解析器接受（即使字段是 REPLACE_ME）
         let _: toml::Value = toml::from_str(TEMPLATE).expect("template must parse");
