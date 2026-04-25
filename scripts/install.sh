@@ -15,7 +15,7 @@ usage() {
 Usage:
   install.sh --cli <name> [--version <vX.Y.Z>] [--dir <path>] [--dry-run]
 
-Env vars (override flags if set):
+Env vars (flags override these when both set):
   REPO            default: yuebanhome/all-cli
   CLI_NAME        equivalent to --cli
   VERSION         equivalent to --version (default: latest)
