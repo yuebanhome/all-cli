@@ -49,3 +49,13 @@ iwr -useb https://raw.githubusercontent.com/yuebanhome/all-cli/main/scripts/inst
 每个 CLI 独立版本号，独立打 tag、独立发布 GitHub Release。流程见 [`docs/RELEASING.md`](./docs/RELEASING.md)。
 
 tag 命名约定：`<cli-name>-v<semver>`，例：`sub2api-image-v0.1.0`、`sub2api-image-v0.1.0-rc.1`（带后缀的视为 pre-release，不会被标为 latest）。
+
+## Skills
+
+可下载的 Codex skills 放在 [`skills/`](./skills)。当前提供：
+
+| 目录 | 用途 |
+|------|------|
+| [`skills/sub2api-image`](./skills/sub2api-image) | 让 Agent 安装、配置和使用 `sub2api-image` 生成或编辑图片 |
+
+使用时复制对应目录到你的 Codex skills 目录，或在支持的客户端中按目录安装。

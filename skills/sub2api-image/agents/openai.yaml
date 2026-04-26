@@ -1,0 +1,7 @@
+interface:
+  display_name: "sub2api-image"
+  short_description: "Generate and edit images with sub2api-image"
+  default_prompt: "Use $sub2api-image to generate or edit an image through my configured gpt-image-2 compatible gateway."
+
+policy:
+  allow_implicit_invocation: true
