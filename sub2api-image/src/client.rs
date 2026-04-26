@@ -2,9 +2,11 @@ use anyhow::{Context, Result};
 use reqwest::blocking::Client;
 use std::time::Duration;
 
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(300);
+
 pub fn build_client() -> Result<Client> {
     Client::builder()
-        .timeout(Duration::from_secs(120))
+        .timeout(REQUEST_TIMEOUT)
         .user_agent(user_agent())
         .build()
         .context("network error: cannot build HTTP client")
@@ -42,6 +44,11 @@ mod tests {
     #[test]
     fn builds_client() {
         build_client().unwrap();
+    }
+
+    #[test]
+    fn request_timeout_allows_slow_image_generation() {
+        assert_eq!(REQUEST_TIMEOUT, Duration::from_secs(300));
     }
 
     #[test]
