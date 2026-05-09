@@ -1,0 +1,35 @@
+[package]
+name = "playctl"
+version = "0.1.0"
+edition = "2021"
+description = "Local HTTP playground server controller for the live-playground skill"
+license = "MIT"
+repository = "https://github.com/yuebanhome/all-cli"
+readme = "README.md"
+keywords = ["cli", "playground", "http", "axum", "claude"]
+categories = ["command-line-utilities", "development-tools"]
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+axum = "0.7"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal"] }
+tower-http = { version = "0.5", features = ["fs", "compression-gzip", "trace"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rust-embed = { version = "8", features = ["debug-embed"] }
+time = { version = "0.3", features = ["formatting", "parsing", "serde"] }
+anyhow = "1"
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[target.'cfg(unix)'.dependencies]
+daemonize = "0.5"
+nix = { version = "0.27", features = ["signal", "process"] }
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
+tempfile = "3"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
+serial_test = "3"
