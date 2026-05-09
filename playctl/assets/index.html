@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{project_name}} — playctl</title>
+<link rel="stylesheet" href="/_internal/style.css">
+</head>
+<body>
+<header>
+  <h1>{{project_name}}</h1>
+  <small>port {{port}} · <span id="count">…</span> playgrounds</small>
+</header>
+<main id="list" aria-busy="true">Loading…</main>
+<footer>
+  <small>playctl v{{version}} · <a href="https://github.com/yuebanhome/all-cli">github</a></small>
+</footer>
+<script>
+fetch("/_internal/index.json")
+  .then(r => r.json())
+  .then(data => {
+    const list = document.getElementById("list");
+    document.getElementById("count").textContent = data.playgrounds.length;
+    if (!data.playgrounds.length) {
+      list.innerHTML = `<div class="empty">
+        <p>No playgrounds yet.</p>
+        <p>Run <code>playctl new &lt;slug&gt;</code> in this project to create one.</p>
+        <p>Files live in <code>.playgrounds/</code> at the project root.</p>
+      </div>`;
+      list.removeAttribute("aria-busy");
+      return;
+    }
+    list.innerHTML = data.playgrounds.map(p => `
+      <a class="card" href="/${encodeURIComponent(p.slug)}/">
+        <h2>${escapeHtml(p.title)}</h2>
+        <p>${escapeHtml(p.description || '')}</p>
+        <small>${escapeHtml(p.created_at)}</small>
+      </a>
+    `).join("");
+    list.removeAttribute("aria-busy");
+  })
+  .catch(e => {
+    document.getElementById("list").textContent = "Failed to load index: " + e;
+  });
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+}
+</script>
+</body>
+</html>

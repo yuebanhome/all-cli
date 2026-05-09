@@ -112,4 +112,10 @@ mod tests {
             assert!(body.contains(&format!("# {name}")), "{name} missing heading");
         }
     }
+
+    #[test]
+    fn assets_present() {
+        assert!(read_asset("index.html").is_ok());
+        assert!(read_asset("style.css").is_ok());
+    }
 }
