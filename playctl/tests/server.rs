@@ -1,0 +1,108 @@
+use playctl::index::{write_index, Index, Playground};
+use playctl::server::{build_router, AppState};
+use std::net::TcpListener;
+use std::sync::Arc;
+
+fn spawn_server(project_root: std::path::PathBuf) -> u16 {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(async move {
+            listener.set_nonblocking(true).ok();
+            let l = tokio::net::TcpListener::from_std(listener).unwrap();
+            let app = build_router(AppState {
+                project_root: Arc::new(project_root),
+                port,
+            });
+            let _ = tokio::time::timeout(
+                std::time::Duration::from_secs(15),
+                axum::serve(l, app),
+            )
+            .await;
+        });
+    });
+    std::thread::sleep(std::time::Duration::from_millis(300));
+    port
+}
+
+#[test]
+fn healthz_returns_ok() {
+    let td = tempfile::TempDir::new().unwrap();
+    let port = spawn_server(td.path().to_path_buf());
+    let r = reqwest::blocking::get(format!("http://127.0.0.1:{port}/healthz")).unwrap();
+    assert_eq!(r.status(), 200);
+    assert_eq!(r.text().unwrap(), "OK");
+}
+
+#[test]
+fn index_page_contains_project_name() {
+    let td = tempfile::TempDir::new().unwrap();
+    let name = td.path().file_name().unwrap().to_string_lossy().into_owned();
+    let port = spawn_server(td.path().to_path_buf());
+    let body = reqwest::blocking::get(format!("http://127.0.0.1:{port}/"))
+        .unwrap()
+        .text()
+        .unwrap();
+    assert!(body.contains(&name), "expected {name} in body");
+    assert!(body.contains(&format!("port {port}")));
+}
+
+#[test]
+fn internal_index_json_passthrough() {
+    let td = tempfile::TempDir::new().unwrap();
+    let mut idx = Index::empty("p");
+    idx.playgrounds.push(Playground {
+        slug: "card-tuner".into(),
+        title: "Card Tuner".into(),
+        description: "demo".into(),
+        template: "design-playground".into(),
+        created_at: "2026-05-09T00:00:00Z".into(),
+    });
+    write_index(td.path(), &idx).unwrap();
+    let port = spawn_server(td.path().to_path_buf());
+    let body = reqwest::blocking::get(format!("http://127.0.0.1:{port}/_internal/index.json"))
+        .unwrap()
+        .text()
+        .unwrap();
+    assert!(body.contains("card-tuner"));
+    assert!(body.contains("\"version\":1"));
+}
+
+#[test]
+fn slug_serves_index_html() {
+    let td = tempfile::TempDir::new().unwrap();
+    let pg = td.path().join(".playgrounds/foo");
+    std::fs::create_dir_all(&pg).unwrap();
+    std::fs::write(pg.join("index.html"), "<html><body>HELLO-FOO</body></html>").unwrap();
+    let port = spawn_server(td.path().to_path_buf());
+
+    // 不带尾斜杠 → 308 (axum::Redirect::permanent)
+    let client = reqwest::blocking::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .unwrap();
+    let r = client
+        .get(format!("http://127.0.0.1:{port}/foo"))
+        .send()
+        .unwrap();
+    assert_eq!(r.status(), 308);
+
+    // 带尾斜杠 → 200 + 内容
+    let body = reqwest::blocking::get(format!("http://127.0.0.1:{port}/foo/"))
+        .unwrap()
+        .text()
+        .unwrap();
+    assert!(body.contains("HELLO-FOO"));
+}
+
+#[test]
+fn unknown_slug_returns_404() {
+    let td = tempfile::TempDir::new().unwrap();
+    let port = spawn_server(td.path().to_path_buf());
+    let r = reqwest::blocking::get(format!("http://127.0.0.1:{port}/nonexistent/")).unwrap();
+    assert_eq!(r.status(), 404);
+}
