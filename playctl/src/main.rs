@@ -1,4 +1,5 @@
 mod error;
+mod index;
 mod project;
 mod templates;
 
