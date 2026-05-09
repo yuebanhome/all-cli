@@ -9,6 +9,14 @@ readme = "README.md"
 keywords = ["cli", "playground", "http", "axum", "claude"]
 categories = ["command-line-utilities", "development-tools"]
 
+[lib]
+name = "playctl"
+path = "src/lib.rs"
+
+[[bin]]
+name = "playctl"
+path = "src/main.rs"
+
 [dependencies]
 clap = { version = "4", features = ["derive"] }
 axum = "0.7"
