@@ -44,9 +44,8 @@ pub fn classify(err: &anyhow::Error) -> u8 {
         3
     } else if buf.contains("server failed to start within") {
         4
-    } else if buf.contains("internal error:") {
-        5
     } else {
+        // Internal 与未知错误都映射到 5；放在最后兜底。
         5
     }
 }
@@ -116,7 +115,7 @@ mod tests {
     #[test]
     fn with_context_user_error_classifies_correctly() {
         use anyhow::Context;
-        let io_err = std::io::Error::new(std::io::ErrorKind::Other, "x");
+        let io_err = std::io::Error::other("x");
         let r: anyhow::Result<()> = Err::<(), _>(io_err)
             .with_context(|| ExitError::User("bad slug".into()));
         assert_eq!(classify(&r.unwrap_err()), 1);
@@ -125,7 +124,7 @@ mod tests {
     #[test]
     fn with_context_internal_error_classifies_correctly() {
         use anyhow::Context;
-        let io_err = std::io::Error::new(std::io::ErrorKind::Other, "x");
+        let io_err = std::io::Error::other("x");
         let r: anyhow::Result<()> = Err::<(), _>(io_err)
             .with_context(|| ExitError::Internal("boom".into()));
         assert_eq!(classify(&r.unwrap_err()), 5);
