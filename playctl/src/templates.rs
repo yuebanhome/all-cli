@@ -104,4 +104,12 @@ mod tests {
         assert!(s.contains("<title>My Tool</title>"));
         assert!(s.contains("do stuff"));
     }
+
+    #[test]
+    fn all_six_templates_resolve() {
+        for name in VALID_TEMPLATE_NAMES {
+            let body = read_template(name).unwrap_or_else(|e| panic!("{name}: {e}"));
+            assert!(body.contains(&format!("# {name}")), "{name} missing heading");
+        }
+    }
 }
