@@ -26,14 +26,29 @@ impl ExitError {
     }
 }
 
-/// 把 anyhow::Error 链解到 ExitError；找不到则按 Internal 处理。
+/// 把 anyhow::Error 链上的 Display 串接起来，按 ExitError 各变体的消息前缀分流到 exit code。
+/// 这种字符串方法比 downcast 更鲁棒：`with_context(|| ExitError::X(...))` 把类型擦除成
+/// `ContextError`，downcast 就拿不到原 ExitError；而 ContextError 的 Display 仍然是 X 的 Display，
+/// 所以前缀匹配照样命中。
 pub fn classify(err: &anyhow::Error) -> u8 {
-    for cause in err.chain() {
-        if let Some(e) = cause.downcast_ref::<ExitError>() {
-            return e.exit_code();
-        }
+    let mut buf = err.to_string();
+    for cause in err.chain().skip(1) {
+        buf.push_str(" | ");
+        buf.push_str(&cause.to_string());
     }
-    5
+    if buf.contains("user error:") {
+        1
+    } else if buf.contains("env error:") {
+        2
+    } else if buf.contains("port exhaustion:") {
+        3
+    } else if buf.contains("server failed to start within") {
+        4
+    } else if buf.contains("internal error:") {
+        5
+    } else {
+        5
+    }
 }
 
 #[cfg(test)]
@@ -82,5 +97,37 @@ mod tests {
     fn unknown_falls_to_5() {
         let err = anyhow!("nothing typed");
         assert_eq!(classify(&err), 5);
+    }
+
+    #[test]
+    fn with_context_wrapped_typed_error_classifies_correctly() {
+        // 这是 project.rs / index.rs / server.rs 等下游模块用的实际模式。
+        // 之前的 downcast 实现会把这个错误归到 5（Internal），现在应当归到 2 (Env)。
+        use anyhow::Context;
+
+        let io_err = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "denied");
+        let result: Result<(), std::io::Error> = Err(io_err);
+        let wrapped: anyhow::Result<()> = result
+            .with_context(|| ExitError::Env(format!("write {}", "/tmp/x")));
+        let err = wrapped.unwrap_err();
+        assert_eq!(classify(&err), 2);
+    }
+
+    #[test]
+    fn with_context_user_error_classifies_correctly() {
+        use anyhow::Context;
+        let io_err = std::io::Error::new(std::io::ErrorKind::Other, "x");
+        let r: anyhow::Result<()> = Err::<(), _>(io_err)
+            .with_context(|| ExitError::User("bad slug".into()));
+        assert_eq!(classify(&r.unwrap_err()), 1);
+    }
+
+    #[test]
+    fn with_context_internal_error_classifies_correctly() {
+        use anyhow::Context;
+        let io_err = std::io::Error::new(std::io::ErrorKind::Other, "x");
+        let r: anyhow::Result<()> = Err::<(), _>(io_err)
+            .with_context(|| ExitError::Internal("boom".into()));
+        assert_eq!(classify(&r.unwrap_err()), 5);
     }
 }
