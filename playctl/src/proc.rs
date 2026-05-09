@@ -1,7 +1,7 @@
 use crate::error::ExitError;
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use std::fs;
-use std::net::TcpStream;
+use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -109,6 +109,59 @@ pub fn probe(project_root: &Path) -> AliveStatus {
     AliveStatus::Running(h)
 }
 
+/// 从 base 起递增最多 max_tries 次找到可绑端口。返回 (listener, chosen_port)。
+pub fn pick_port(base: u16, max_tries: u16) -> Result<(TcpListener, u16)> {
+    let mut last_err: Option<std::io::Error> = None;
+    for offset in 0..max_tries {
+        let p = base.checked_add(offset).ok_or_else(|| {
+            anyhow!(ExitError::PortExhausted {
+                start: base,
+                tried: offset,
+            })
+        })?;
+        match TcpListener::bind(("127.0.0.1", p)) {
+            Ok(l) => return Ok((l, p)),
+            Err(e) => last_err = Some(e),
+        }
+    }
+    Err(anyhow!(ExitError::PortExhausted {
+        start: base,
+        tried: max_tries,
+    })
+    .context(
+        last_err
+            .map(|e| e.to_string())
+            .unwrap_or_else(|| "no error captured".into()),
+    ))
+}
+
+#[cfg(unix)]
+pub fn daemonize_to_log(log: &Path) -> Result<()> {
+    use daemonize::Daemonize;
+    let stdout = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log)
+        .with_context(|| ExitError::Env(format!("open {}", log.display())))?;
+    let stderr = stdout
+        .try_clone()
+        .with_context(|| ExitError::Internal("clone log fd".into()))?;
+    Daemonize::new()
+        .working_directory(".")
+        .stdout(stdout)
+        .stderr(stderr)
+        .start()
+        .map_err(|e| anyhow!(ExitError::Internal(format!("daemonize: {e}"))))?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
+pub fn daemonize_to_log(_log: &Path) -> Result<()> {
+    Err(anyhow!(ExitError::Env(
+        "Windows native is not supported in v1; use WSL2 instead".into()
+    )))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -148,5 +201,16 @@ mod tests {
         let td = TempDir::new().unwrap();
         write_handle(td.path(), &ServerHandle { pid: u32::MAX, port: 1 }).unwrap();
         assert_eq!(probe(td.path()), AliveStatus::Stale);
+    }
+
+    #[test]
+    fn pick_port_returns_bound_listener() {
+        // 用任意可绑端口（base=20000）；如果占用就向上 fallback
+        let (l, p) = pick_port(20000, 16).unwrap();
+        assert_eq!(l.local_addr().unwrap().port(), p);
+        // 并发占用相同端口应 fallback
+        let (l2, p2) = pick_port(p, 16).unwrap();
+        assert_eq!(l2.local_addr().unwrap().port(), p2);
+        assert_ne!(p, p2);
     }
 }
