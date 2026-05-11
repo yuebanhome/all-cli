@@ -22,7 +22,7 @@ slug 字面值仍需满足 `^[a-z0-9][a-z0-9-]{0,63}$`（详见 SKILL.md 顶部�
 AI 在重写 HTML 时，把上一轮收到的 fenced `ask-result` 块里的 YAML 主体抽出来（去掉围栏行与 header，只保留主体），原样塞进 `<details>` 内部的 `<pre><code>` 块。示意片段：
 
 ```html
-<details class="prev-round" open>
+<details class="prev-round">
   <summary>Round 1 答案</summary>
   <pre><code>choice: option_b
 note: 因为 B 的视觉层级最清晰</code></pre>
@@ -39,7 +39,7 @@ note: 因为 B 的视觉层级最清晰</code></pre>
 
 `round` 数字必须同时出现在两个位置：
 
-a. **`ask-result` fenced header 行**——见 `references/response-format.md` 的 *fenced header 语法* 节，header 4 个必填字段里就有 `round=<N>`。AI 在重写 HTML 模板里的 fenced 块时，把 header 行的 `round=` 值与本轮一致地更新。
+a. **`ask-result` fenced header 行**——见 `references/response-format.md` 的 *fenced header 语法* 节，header 4 个必填字段 (`slug` / `round` / `template` / `ts`) 中的 `round=<N>`。AI 在重写 HTML 模板里的 fenced 块时，把 header 行的 `round=` 值与本轮一致地更新。
 
 b. **页面顶栏的可见文本**——譬如顶栏写 "Round 2 · <任务名>" 或 "Round 2"。用户一眼能看到当前是第几轮，跟折叠区的 "Round 1 答案" 形成对应关系。
 
