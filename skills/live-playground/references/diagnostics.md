@@ -20,7 +20,7 @@ live-playground v2 在调用 `playctl` 过程中可能遇到的故障分类、�
 这一节是**给后续维护本文档的人**的明示提醒，避免 v1 的错误文案被回归带回来。
 
 - v1 `skills/live-playground/SKILL.md` 的 Diagnostics 节把 exit 2 描述为「用户不在项目目录里且没传 `--root`」，这是**旧语义**，当前 `playctl` 已经不这样行为了。
-- 当前 `playctl`（`>= 0.1.0`）在找不到 root marker（`.git` / `Cargo.toml` / `package.json` / `pnpm-workspace.yaml` / `pyproject.toml` / `go.mod`）时，会 **fallback 到 cwd** 并向 **stderr** 打印 `warn: no project marker found; using <cwd>`；见 `playctl/src/project.rs:17`（`detect_project_root` 的 fallback 分支）和 `playctl/src/main.rs:68`（`resolve_root` 中的 warn 打印）。这是 warning，**不会** exit 2。
+- 当前 `playctl`（`>= 0.1.0`）在找不到 root marker（`.git` / `Cargo.toml` / `package.json` / `pnpm-workspace.yaml` / `pyproject.toml` / `go.mod`）时，会 **fallback 到 cwd** 并向 **stderr** 打印 `warn: no project marker found; using <cwd>`；见 `playctl/src/project.rs:17–28`（`detect_project_root` 的 fallback 分支）和 `playctl/src/main.rs:62–72`（`resolve_root` 中的 warn 打印）。这是 warning，**不会** exit 2。
 - 因此 exit 2 的**正确**语义就是上文对照表里写的：`.runtime/` 不可写、`cwd()` 系统调用失败、写 `.gitignore` 失败等真正的文件系统 / 环境层面错误。
 - 维护本文档时**不要**照抄 v1 的旧文案；本节本身就是写给后续维护者的护栏，避免回归。
 
