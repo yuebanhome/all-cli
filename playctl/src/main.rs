@@ -235,13 +235,70 @@ fn cmd_list(cli: &Cli) -> Result<()> {
     Ok(())
 }
 fn cmd_new(
-    _cli: &Cli,
-    _slug: &str,
-    _template: &str,
-    _title: Option<&str>,
-    _desc: Option<&str>,
+    cli: &Cli,
+    slug: &str,
+    template: &str,
+    title: Option<&str>,
+    description: Option<&str>,
 ) -> Result<()> {
-    todo!("Task 16")
+    if !is_valid_new_slug(slug) {
+        return Err(anyhow::anyhow!(ExitError::User(format!(
+            "invalid slug '{slug}'; must match [a-z0-9][a-z0-9-]{{0,63}}"
+        ))));
+    }
+    if !playctl::templates::VALID_TEMPLATE_NAMES.contains(&template) {
+        return Err(anyhow::anyhow!(ExitError::User(format!(
+            "unknown template '{template}'; valid: {}",
+            playctl::templates::VALID_TEMPLATE_NAMES.join(", ")
+        ))));
+    }
+
+    let root = resolve_root(cli)?;
+    let dir = root.join(".playgrounds").join(slug);
+    if dir.exists() {
+        return Err(anyhow::anyhow!(ExitError::User(format!(
+            "{} already exists",
+            dir.display()
+        ))));
+    }
+    std::fs::create_dir_all(&dir)
+        .with_context(|| ExitError::Env(format!("mkdir {}", dir.display())))?;
+
+    let title_owned = title.map(str::to_string).unwrap_or_else(|| humanize(slug));
+    let desc_owned = description.unwrap_or("").to_string();
+    let html = playctl::templates::html_scaffold(&title_owned, &desc_owned);
+    std::fs::write(dir.join("index.html"), html)
+        .with_context(|| ExitError::Env(format!("write {}/index.html", dir.display())))?;
+
+    // 更新 index.json
+    let mut idx = read_index(&root)?;
+    idx.playgrounds.push(playctl::index::Playground {
+        slug: slug.to_string(),
+        title: title_owned,
+        description: desc_owned,
+        template: template.to_string(),
+        created_at: playctl::index::now_iso(),
+    });
+    playctl::index::write_index(&root, &idx)?;
+
+    // 自启动（若未运行）
+    let port = match probe(&root) {
+        AliveStatus::Running(h) => h.port,
+        _ => {
+            cmd_start(cli)?;
+            playctl::proc::read_handle(&root)
+                .map(|h| h.port)
+                .unwrap_or(cli.port)
+        }
+    };
+
+    let url = format!("http://127.0.0.1:{port}/{slug}/");
+    if cli.json {
+        println!("{{\"url\":\"{url}\"}}");
+    } else {
+        println!("{url}");
+    }
+    Ok(())
 }
 fn cmd_reindex(cli: &Cli) -> Result<()> {
     let root = resolve_root(cli)?;
@@ -271,6 +328,31 @@ fn truncate(s: &str, max: usize) -> String {
         out.push('…');
         out
     }
+}
+
+fn is_valid_new_slug(s: &str) -> bool {
+    if s.is_empty() || s.len() > 64 {
+        return false;
+    }
+    let mut chars = s.chars();
+    let first = chars.next().unwrap();
+    if !first.is_ascii_lowercase() && !first.is_ascii_digit() {
+        return false;
+    }
+    chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+fn humanize(slug: &str) -> String {
+    slug.split('-')
+        .map(|w| {
+            let mut c = w.chars();
+            match c.next() {
+                Some(f) => f.to_ascii_uppercase().to_string() + c.as_str(),
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn cmd_open(_cli: &Cli, _slug: Option<&str>) -> Result<()> {
