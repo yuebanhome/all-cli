@@ -1,6 +1,6 @@
 # design-tokens
 
-live-playground v2 问答页面的 CSS 设计 token 规范：所有色值、间距、字号、动画时长、布局阈值（断点 / 触控尺寸）**必须**通过 `var(--token)` 引用，不在 CSS 规则里出现裸值。例外仅限 `references/html-authoring.md` §7.1 末尾列出的"允许的裸值"（`0`、`%`、`fr`、`vh/vw`、`calc()`、border 描边等）。
+live-playground v2 问答页面的 CSS 设计 token 规范：所有色值、间距、字号、动画时长、布局阈值（断点 / 触控尺寸）**必须**通过 `var(--token)` 引用，不在 CSS 规则里出现裸值。例外仅限 `references/html-authoring.md` 的 *Anti-pattern 自检清单* 节末尾列出的"允许的裸值"（`0`、`%`、`fr`、`vh/vw`、`calc()`、border 描边等）。
 
 ## :root token 表
 
@@ -53,7 +53,7 @@ live-playground v2 问答页面的 CSS 设计 token 规范：所有色值、间�
   /* z-index */
   --z-sticky: 10; --z-toast: 20; --z-overlay: 30;
 
-  /* 布局阈值（也走 token，避免 §7.1 反模式误判） */
+  /* 布局阈值（也走 token，避免 Anti-pattern 自检清单误判） */
   --bp-single-column: 720px;   /* 视口 < 此值时强制单列 */
   --touch-target-min: 44px;    /* 触控目标最小边长 */
   --content-max-ch: 70ch;      /* 正文行宽上限 */

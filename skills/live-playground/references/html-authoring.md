@@ -20,7 +20,7 @@ live-playground v2 问答页面的 HTML 写作硬约束：单文件、无外链�
 - **控件语义优先原生，不要叠 ARIA role**：
   - single-choice / multi-choice 的卡片**就是** `<label class="card"><input type="radio|checkbox">…</label>`——原生 `<input>` 自带语义和键盘行为（Space 切换、方向键在同 `name` 的 radio 间移动、focus ring）。**不要**再给 `<label>` 或外层 `<div>` 叠 `role="radio"` / `role="checkbox"`，会与原生语义重复或冲突。
   - 只有当必须做**完全自定义控件**（譬如 ranking 列表项、自定义颜色选择器）时，才使用 ARIA role，**并必须自实现键盘行为**（Tab 进入、Space/Enter 触发、方向键移动），不能仅依赖鼠标事件。
-- **对比度**：WCAG AA（正文 4.5:1，大字 ≥ 18px 或 ≥ 14px bold 时 3:1）；dark 与 light 两种主题都必须达标。设计 token 已按此校准（见 `references/design-tokens.md` §6.1），但若新增局部色值/混合 alpha，必须重新核算。
+- **对比度**：WCAG AA（正文 4.5:1，大字 ≥ 18px 或 ≥ 14px bold 时 3:1）；dark 与 light 两种主题都必须达标。设计 token 已按此校准（见 `references/design-tokens.md` 的 *:root token 表* 节），但若新增局部色值/混合 alpha，必须重新核算。
 - **空态显式渲染**：任何可能为 0 结果的列表（如 multi-choice 一项未选、annotate 一项未操作）显式渲染 "0 of N 匹配"、"未选任何项"、"暂无评论"等文案——不要留空 DOM 让用户误以为页面坏了。
 - **不持久化**：不写 `localStorage` / `sessionStorage` / `IndexedDB`；不发任何外部请求（无 `fetch`、`XMLHttpRequest`、`navigator.sendBeacon`、`<img src="http…">`）。所有状态只活在当前页面 DOM 内，刷新即清零。
 - **HTML 头部必含四件**（缺一即视为不合格，见下节"头部模板"）：
@@ -56,7 +56,7 @@ live-playground v2 问答页面的 HTML 写作硬约束：单文件、无外链�
 
 - **`{{ROUND_TITLE}}`**：1–2 行能概括本轮问题的标题。`playctl reindex` 读取这里写入 `index.json`，给 `playctl list` 和 home 页用。**不要**用 slug 代替（`test-pick-color` 不是标题），**不要**写 "Untitled" / "Playground"。
 - **`{{ROUND_DESCRIPTION}}`**：一句话描述本轮要问什么（题干摘要即可）。同样被 `reindex` 抓走。
-- **`{{INLINE_CSS_INCLUDING_DESIGN_TOKENS}}`**：内联 CSS。**必须**先声明 `references/design-tokens.md` §6.1 中的 `:root { … }` token 集，以及 `@media (prefers-color-scheme: light)` 与 `@media (prefers-reduced-motion: reduce)` 覆写块；随后才是各控件的状态契约落地（§6.2 五态 + 禁用态）和本页面的具体规则。色值 / 间距 / 字号 / 动画时长 / 触控尺寸**全部走 `var(--token)`**，硬编码裸值会在自检清单第 1–2 行被打回。
+- **`{{INLINE_CSS_INCLUDING_DESIGN_TOKENS}}`**：内联 CSS。**必须**先声明 `references/design-tokens.md` 的 *:root token 表* 节中的 `:root { … }` token 集，以及 `@media (prefers-color-scheme: light)` 与 `@media (prefers-reduced-motion: reduce)` 覆写块；随后才是各控件的状态契约落地（见 *组件状态契约* 节：五态 + 禁用态）和本页面的具体规则。色值 / 间距 / 字号 / 动画时长 / 触控尺寸**全部走 `var(--token)`**，硬编码裸值会在自检清单第 1–2 行被打回。
 - **`{{INLINE_JS}}`**：内联 ES2020。原生 DOM API，无依赖。负责：渲染上轮答案、绑定控件 → 实时刷新 sticky prompt 区、Copy 按钮 + Cmd/Ctrl+Enter 快捷键、aria-live 反馈。
 
 ## Anti-pattern 自检清单
