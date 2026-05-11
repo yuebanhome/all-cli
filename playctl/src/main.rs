@@ -445,6 +445,12 @@ fn open_url(url: &str) -> bool {
     }
 }
 
+/// WSL2 探测。`/proc/version` 在 WSL2 上含 "microsoft" 字样。
+///
+/// **降级行为**：`/proc/version` 不可读时（极少见，例如 procfs 未挂载或权限
+/// 异常）静默返回 `false`，调用方会走 `xdg-open` 分支。这是有意为之 ——
+/// 误判为非 WSL 在原生 Linux 上工作正常；误判为 WSL 反而会尝试调用
+/// `wslview` / `cmd.exe`，在原生 Linux 上会失败得更难看。
 fn is_wsl() -> bool {
     if !cfg!(target_os = "linux") {
         return false;

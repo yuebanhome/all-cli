@@ -60,6 +60,13 @@ pub fn read_index(project_root: &Path) -> Result<Index> {
     Ok(idx)
 }
 
+/// 全量重写 `.playgrounds/index.json`。
+///
+/// **并发说明**：本函数与 `read_index` 之间是裸的 read-modify-write，没有
+/// 文件锁。两次并发 `playctl new` 可能让后者覆盖前者写入的条目。playctl
+/// 设计为单用户、单会话本地 CLI，该窗口在实际使用中不会触发；如果用户
+/// 真的同时跑了两个，可以 `playctl reindex` 从磁盘上的 `<slug>/index.html`
+/// 重建 index.json 兜底。
 pub fn write_index(project_root: &Path, idx: &Index) -> Result<()> {
     let p = index_path(project_root);
     fs::create_dir_all(p.parent().unwrap())
