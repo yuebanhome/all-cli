@@ -220,7 +220,7 @@ order: [item_3, item_1, item_4, item_2]
 **键盘可达性要点**
 
 - **上移 / 下移按钮必做，键盘可达**：原生 `<button>`，Tab 可达，Enter/Space 触发；每按一次顺序变化一格。
-- 拖拽是**可选增强**，不能替代键盘——AI 不允许只实现拖拽不实现按钮；纯键盘走完 ranking 路径（Tab 到列表项 → Tab/Enter 到"上移"或"下移"按钮 → 触发至少一次移动 → Tab 到 Copy → Cmd/Ctrl+Enter，剪贴板 `order[]` 顺序与操作匹配）是 SKILL.md 验证矩阵里的必过项。
+- 拖拽是**可选增强**，不能替代键盘——AI 不允许只实现拖拽不实现按钮；纯键盘走完 ranking 路径（Tab 到列表项 → Tab/Enter 到"上移"或"下移"按钮 → 触发至少一次移动 → Tab 到 Copy → Cmd/Ctrl+Enter，剪贴板 `order[]` 顺序与操作匹配）是本模板的**必过验证项**——任何 ranking 实现若做不到这一点都不算完成。
 - 每个按钮 `aria-label` 必须包含被移动项的可读名（"上移 Item 1"），屏幕阅读器朗读时能区分。
 - 按钮触控目标走 `var(--touch-target-min)` (44×44)；按钮间距 ≥ `var(--sp-2)` 避免误触。
 - 移动后焦点**留在刚按的按钮上**（不要重置到列表头），让用户连按多次时不打断节奏；列表顺序变化通过 sticky 预览区的 `aria-live` 读数提示。
@@ -354,7 +354,7 @@ items:
 
 **关键控件**
 
-并排栅格（CSS grid，`grid-template-columns: repeat(N, 1fr)`，N 是候选数）+ 每列底部一个原生 radio（互斥单选，与 single-choice 同结构，不叠 ARIA role）+ 可选"切到大图"切换按钮（同屏放大单个候选）+ 可选 `notes` textarea。窄屏（`< var(--bp-single-column)`）降为可滑动横向栏（见 `references/design-tokens.md` 的 *响应式 & 触摸* 节）。
+并排栅格（CSS grid，`grid-template-columns: repeat(N, 1fr)`，N 是候选数）+ 每列底部一个原生 radio（互斥单选，与 single-choice 同结构，不叠 ARIA role）+ 可选"切到大图"切换按钮（同屏放大单个候选）+ 可选 `notes` textarea。窄屏（视口 < 720px，对应 `--bp-single-column`）降为可滑动横向栏（见 `references/design-tokens.md` 的 *响应式 & 触摸* 节）。
 
 ```html
 <fieldset class="compare-grid"
