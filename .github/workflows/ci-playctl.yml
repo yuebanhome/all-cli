@@ -1,0 +1,27 @@
+name: ci-playctl
+
+on:
+  pull_request:
+    paths:
+      - "playctl/**"
+      - ".github/workflows/rust-ci.yml"
+      - ".github/workflows/ci-playctl.yml"
+  push:
+    branches: [main]
+    paths:
+      - "playctl/**"
+      - ".github/workflows/rust-ci.yml"
+      - ".github/workflows/ci-playctl.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-playctl-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  ci:
+    uses: ./.github/workflows/rust-ci.yml
+    with:
+      crate-path: playctl
