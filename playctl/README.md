@@ -74,6 +74,8 @@ The six embedded templates are read by Claude Code via `playctl print-template <
 
 - Native Windows is **not supported** in v1. The `start`/`stop`/`status` commands bail with a clear message; use WSL2.
 - The HTTP server binds to `127.0.0.1` only and provides no auth — never expose externally.
+- Port selection has a small TOCTOU window: `start` probes a free port, drops the listener, then spawns the child to re-bind. Another local process can grab the port in that window, in which case the 5s `/healthz` wait times out and `start` exits 4. Re-run.
+- Static files under `.playgrounds/<slug>/` are served with `tower-http`'s `ServeDir`; the handler also runs a `canonicalize` check to keep symlinks from escaping the playground directory. Don't put untrusted symlinks under `.playgrounds/`.
 
 ## Development
 

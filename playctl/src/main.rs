@@ -48,8 +48,11 @@ fn run(cli: &Cli) -> Result<()> {
         Cmd::Open { slug } => cmd_open(cli, slug.as_deref()),
         Cmd::PrintTemplate { name } => cmd_print_template(name),
         Cmd::ServeForeground { root, port } => {
+            // bind 失败属于环境层错误 (端口被抢、权限不足等)；不要复用
+            // ServerNotUp { timeout_ms: 0 }，避免 server.log 出现 "within 0ms" 的
+            // 误导性诊断。父进程的 5s healthz 超时仍会让 start 整体退出 4。
             let listener = std::net::TcpListener::bind(("127.0.0.1", *port))
-                .with_context(|| ExitError::ServerNotUp { timeout_ms: 0 })?;
+                .with_context(|| ExitError::Env(format!("bind 127.0.0.1:{port}")))?;
             server_run(listener, root.clone())
         }
     }
@@ -125,6 +128,9 @@ fn cmd_start(cli: &Cli) -> Result<()> {
             if check_healthz(port) {
                 write_handle(&root, &ServerHandle { pid, port })?;
                 print_url(cli, port);
+                // 子进程已 setsid 进入独立会话；这里 forget 是为了避免 Child::drop
+                // 在父进程退出时对一个我们主动 detach 的子进程做无意义的 wait/kill
+                // 探测。僵尸由 init (pid 1) 回收。
                 std::mem::forget(child);
                 return Ok(());
             }
@@ -362,6 +368,15 @@ fn humanize(slug: &str) -> String {
 }
 
 fn cmd_open(cli: &Cli, slug: Option<&str>) -> Result<()> {
+    // 校验 slug 合法性，避免把任意字符串塞进 xdg-open / wslview / cmd.exe 参数。
+    // 即便 Rust 1.77 之后 `Command` 对 `.bat`/`.cmd` 注入做了转义，仍保持显式拒绝。
+    if let Some(s) = slug {
+        if !is_valid_new_slug(s) {
+            return Err(anyhow::anyhow!(ExitError::User(format!(
+                "invalid slug '{s}'; must match [a-z0-9][a-z0-9-]{{0,63}}"
+            ))));
+        }
+    }
     let root = resolve_root(cli)?;
     let port = match probe(&root) {
         AliveStatus::Running(h) => h.port,

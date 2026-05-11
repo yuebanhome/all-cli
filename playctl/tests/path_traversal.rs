@@ -27,7 +27,7 @@ fn slug_path_with_dotdot_returns_404() {
         });
     });
 
-    std::thread::sleep(std::time::Duration::from_millis(300));
+    wait_for_healthz(port);
 
     let url = format!("http://127.0.0.1:{port}/foo/../../etc/passwd");
     let resp = reqwest::blocking::get(&url).unwrap();
@@ -38,4 +38,22 @@ fn slug_path_with_dotdot_returns_404() {
         resp.status()
     );
     let _ = handle.join();
+}
+
+fn wait_for_healthz(port: u16) {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    let url = format!("http://127.0.0.1:{port}/healthz");
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_millis(200))
+        .build()
+        .unwrap();
+    while std::time::Instant::now() < deadline {
+        if let Ok(r) = client.get(&url).send() {
+            if r.status().is_success() {
+                return;
+            }
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    panic!("server on port {port} did not respond to /healthz within 5s");
 }

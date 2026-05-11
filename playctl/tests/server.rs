@@ -22,8 +22,26 @@ fn spawn_server(project_root: std::path::PathBuf) -> u16 {
                 tokio::time::timeout(std::time::Duration::from_secs(15), axum::serve(l, app)).await;
         });
     });
-    std::thread::sleep(std::time::Duration::from_millis(300));
+    wait_for_healthz(port);
     port
+}
+
+fn wait_for_healthz(port: u16) {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    let url = format!("http://127.0.0.1:{port}/healthz");
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_millis(200))
+        .build()
+        .unwrap();
+    while std::time::Instant::now() < deadline {
+        if let Ok(r) = client.get(&url).send() {
+            if r.status().is_success() {
+                return;
+            }
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    panic!("server on port {port} did not respond to /healthz within 5s");
 }
 
 #[test]

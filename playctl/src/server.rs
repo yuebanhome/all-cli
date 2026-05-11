@@ -117,6 +117,12 @@ async fn slug_static(State(s): State<AppState>, uri: Uri) -> Response<Body> {
         return not_found();
     }
 
+    // Symlink escape 兜底：tower-http 0.5 ServeDir 没有 follow_symlinks(false)。
+    // 在 ServeDir 之前先按 rest 的清理后路径做 canonicalize，确认最终目标仍位于
+    // serve_root 之内；ServeDir 自己也会再 open 一次，开销可忽略。
+    if !rest.is_empty() && !is_inside_serve_root(&serve_root, rest) {
+        return not_found();
+    }
     let mut svc = ServeDir::new(&serve_root).append_index_html_on_directories(true);
     let req_path = if rest.is_empty() {
         "/".to_string()
@@ -138,6 +144,27 @@ async fn slug_static(State(s): State<AppState>, uri: Uri) -> Response<Body> {
         }
         Err(_) => server_error("static serve failed"),
     }
+}
+
+/// 在执行 ServeDir 之前，确认 `serve_root / rest` 的 canonical 路径仍位于
+/// `serve_root` 的 canonical 路径之内，防止 .playgrounds/<slug>/ 下的 symlink
+/// 逃逸到宿主文件系统（tower-http 0.5 ServeDir 没有 follow_symlinks 选项）。
+///
+/// rest 取自 URL path，未做 percent-decode；ServeDir 自身已经拒绝 `..` /
+/// 绝对根 / Windows 盘符等组件，这里只额外验 canonical 仍位于 serve_root 内。
+fn is_inside_serve_root(serve_root: &std::path::Path, rest: &str) -> bool {
+    let rel = std::path::Path::new(rest);
+    let target = serve_root.join(rel);
+    let target_can = match std::fs::canonicalize(&target) {
+        Ok(p) => p,
+        // 路径不存在 → 留给 ServeDir 走正常 404；canonical 校验不在此处提前拒。
+        Err(_) => return true,
+    };
+    let root_can = match std::fs::canonicalize(serve_root) {
+        Ok(p) => p,
+        Err(_) => return false,
+    };
+    target_can.starts_with(&root_can)
 }
 
 fn is_valid_slug(s: &str) -> bool {
