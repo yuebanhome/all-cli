@@ -9,6 +9,7 @@
 | 目录 | 名称 | 简介 |
 |------|------|------|
 | [`sub2api-image`](./sub2api-image) | sub2api-image | gpt-image-2 兼容网关的命令行客户端，支持文生图与图像编辑 |
+| [`playctl`](./playctl) | playctl | 本地 HTTP playground 服务器控制器，配套 `live-playground` skill |
 
 ## 目录结构约定
 
@@ -57,5 +58,6 @@ tag 命名约定：`<cli-name>-v<semver>`，例：`sub2api-image-v0.1.0`、`sub2
 | 目录 | 用途 |
 |------|------|
 | [`skills/sub2api-image`](./skills/sub2api-image) | 让 Agent 安装、配置和使用 `sub2api-image` 生成或编辑图片 |
+| [`skills/live-playground`](./skills/live-playground) | 让 Agent 在项目里搭建可交互的本地 HTML playground |
 
 使用时复制对应目录到你的 Codex skills 目录，或在支持的客户端中按目录安装。
