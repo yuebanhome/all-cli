@@ -355,8 +355,87 @@ fn humanize(slug: &str) -> String {
         .join(" ")
 }
 
-fn cmd_open(_cli: &Cli, _slug: Option<&str>) -> Result<()> {
-    todo!("Task 17")
+fn cmd_open(cli: &Cli, slug: Option<&str>) -> Result<()> {
+    let root = resolve_root(cli)?;
+    let port = match probe(&root) {
+        AliveStatus::Running(h) => h.port,
+        _ => {
+            cmd_start(cli)?;
+            playctl::proc::read_handle(&root)
+                .map(|h| h.port)
+                .unwrap_or(cli.port)
+        }
+    };
+    let url = match slug {
+        Some(s) => format!("http://127.0.0.1:{port}/{s}/"),
+        None => format!("http://127.0.0.1:{port}/"),
+    };
+    let opened = open_url(&url);
+    if !opened && !cli.quiet {
+        println!("(could not auto-open) {url}");
+    } else if !cli.quiet {
+        println!("{url}");
+    }
+    Ok(())
+}
+
+fn open_url(url: &str) -> bool {
+    use std::process::Command;
+
+    // WSL2 优先尝试 wslview，再 fallback 到 cmd.exe
+    if is_wsl() {
+        if Command::new("wslview")
+            .arg(url)
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+        {
+            return true;
+        }
+        if Command::new("cmd.exe")
+            .args(["/c", "start", "", url])
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+        {
+            return true;
+        }
+        return false;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        return Command::new("open")
+            .arg(url)
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        return Command::new("xdg-open")
+            .arg(url)
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+    }
+    #[cfg(windows)]
+    {
+        return Command::new("cmd.exe")
+            .args(["/c", "start", "", url])
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+    }
+}
+
+fn is_wsl() -> bool {
+    if !cfg!(target_os = "linux") {
+        return false;
+    }
+    std::fs::read_to_string("/proc/version")
+        .map(|s| s.to_lowercase().contains("microsoft"))
+        .unwrap_or(false)
 }
 fn cmd_print_template(_name: &str) -> Result<()> {
     todo!("Task 18")
