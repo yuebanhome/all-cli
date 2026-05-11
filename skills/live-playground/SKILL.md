@@ -20,6 +20,8 @@ curl -fsSL https://raw.githubusercontent.com/yuebanhome/all-cli/main/scripts/ins
 
 从本地 checkout 安装：`cd playctl && cargo install --path .`。
 
+**Windows**：推荐用 WSL2 走 Linux 路径；如果一定要原生 PowerShell，看仓库根 `scripts/install.ps1`，但 v2 `playctl` 的 lifecycle 子命令（`start` / `stop` / `status`）在原生 Windows 会主动退出并要求改用 WSL2。
+
 兼容性：本 skill 假设 `playctl >= 0.1.0`。
 
 ## When to use
@@ -103,4 +105,4 @@ const url = `${baseClean}/${slug}/`;
 
 ## Other uses
 
-如果不是问答场景而是连续调参 / 批量批注式探索，仍可用 `playctl print-template <name>`（内置 6 个探索型模板：`design-playground` / `data-explorer` / `concept-map` / `document-critique` / `diff-review` / `code-map`）。不在本 skill 的主路径里详述。
+如果不是问答场景而是连续调参 / 批量批注式探索，仍可用 `playctl print-template <name>`（内置 6 个探索型模板：`design-playground` / `data-explorer` / `concept-map` / `document-critique` / `diff-review` / `code-map`）。**这条路径不走本 skill 的 ask-result 协议**——它与 v2 问答流程互斥，仅作为旧能力保留。如果你想要的是“AI 向人结构化提问”，请走 *Workflow* 节，不要把 `print-template` 出来的探索模板塞进 ask-result 流程。
