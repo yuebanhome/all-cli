@@ -437,6 +437,8 @@ fn is_wsl() -> bool {
         .map(|s| s.to_lowercase().contains("microsoft"))
         .unwrap_or(false)
 }
-fn cmd_print_template(_name: &str) -> Result<()> {
-    todo!("Task 18")
+fn cmd_print_template(name: &str) -> Result<()> {
+    let body = playctl::templates::read_template(name)?;
+    print!("{body}");
+    Ok(())
 }
