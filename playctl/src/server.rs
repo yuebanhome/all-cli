@@ -132,10 +132,8 @@ async fn slug_static(State(s): State<AppState>, uri: Uri) -> Response<Body> {
             let (parts, body): (_, tower_http::services::fs::ServeFileSystemResponseBody) =
                 resp.into_parts();
             let mut resp = Response::from_parts(parts, axum::body::Body::new(body));
-            resp.headers_mut().insert(
-                header::CACHE_CONTROL,
-                HeaderValue::from_static("no-cache"),
-            );
+            resp.headers_mut()
+                .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
             resp
         }
         Err(_) => server_error("static serve failed"),

@@ -26,8 +26,7 @@ pub fn log_path(project_root: &Path) -> PathBuf {
 
 pub fn ensure_runtime_dir(project_root: &Path) -> Result<()> {
     let d = runtime_dir(project_root);
-    fs::create_dir_all(&d)
-        .with_context(|| ExitError::Env(format!("mkdir {}", d.display())))?;
+    fs::create_dir_all(&d).with_context(|| ExitError::Env(format!("mkdir {}", d.display())))?;
     Ok(())
 }
 
@@ -68,15 +67,17 @@ pub fn is_alive(_pid: u32) -> bool {
 /// 半秒超时连一次 /healthz；不阻塞超过 ~500ms。
 pub fn check_healthz(port: u16) -> bool {
     let addr = format!("127.0.0.1:{port}");
-    let stream = match TcpStream::connect_timeout(
-        &addr.parse().unwrap(),
-        Duration::from_millis(250),
-    ) {
-        Ok(s) => s,
-        Err(_) => return false,
-    };
-    stream.set_read_timeout(Some(Duration::from_millis(250))).ok();
-    stream.set_write_timeout(Some(Duration::from_millis(250))).ok();
+    let stream =
+        match TcpStream::connect_timeout(&addr.parse().unwrap(), Duration::from_millis(250)) {
+            Ok(s) => s,
+            Err(_) => return false,
+        };
+    stream
+        .set_read_timeout(Some(Duration::from_millis(250)))
+        .ok();
+    stream
+        .set_write_timeout(Some(Duration::from_millis(250)))
+        .ok();
     use std::io::{Read, Write};
     let req = b"GET /healthz HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n";
     let mut s = stream;
@@ -170,7 +171,10 @@ mod tests {
     #[test]
     fn round_trip_handle() {
         let td = TempDir::new().unwrap();
-        let h = ServerHandle { pid: 12345, port: 4747 };
+        let h = ServerHandle {
+            pid: 12345,
+            port: 4747,
+        };
         write_handle(td.path(), &h).unwrap();
         assert_eq!(read_handle(td.path()), Some(h));
         clear_handle(td.path());
@@ -199,7 +203,14 @@ mod tests {
     #[test]
     fn probe_stale_when_pid_dead() {
         let td = TempDir::new().unwrap();
-        write_handle(td.path(), &ServerHandle { pid: u32::MAX, port: 1 }).unwrap();
+        write_handle(
+            td.path(),
+            &ServerHandle {
+                pid: u32::MAX,
+                port: 1,
+            },
+        )
+        .unwrap();
         assert_eq!(probe(td.path()), AliveStatus::Stale);
     }
 

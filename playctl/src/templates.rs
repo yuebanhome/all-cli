@@ -109,7 +109,10 @@ mod tests {
     fn all_six_templates_resolve() {
         for name in VALID_TEMPLATE_NAMES {
             let body = read_template(name).unwrap_or_else(|e| panic!("{name}: {e}"));
-            assert!(body.contains(&format!("# {name}")), "{name} missing heading");
+            assert!(
+                body.contains(&format!("# {name}")),
+                "{name} missing heading"
+            );
         }
     }
 

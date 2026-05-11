@@ -18,11 +18,8 @@ fn spawn_server(project_root: std::path::PathBuf) -> u16 {
                 project_root: Arc::new(project_root),
                 port,
             });
-            let _ = tokio::time::timeout(
-                std::time::Duration::from_secs(15),
-                axum::serve(l, app),
-            )
-            .await;
+            let _ =
+                tokio::time::timeout(std::time::Duration::from_secs(15), axum::serve(l, app)).await;
         });
     });
     std::thread::sleep(std::time::Duration::from_millis(300));
@@ -41,7 +38,12 @@ fn healthz_returns_ok() {
 #[test]
 fn index_page_contains_project_name() {
     let td = tempfile::TempDir::new().unwrap();
-    let name = td.path().file_name().unwrap().to_string_lossy().into_owned();
+    let name = td
+        .path()
+        .file_name()
+        .unwrap()
+        .to_string_lossy()
+        .into_owned();
     let port = spawn_server(td.path().to_path_buf());
     let body = reqwest::blocking::get(format!("http://127.0.0.1:{port}/"))
         .unwrap()

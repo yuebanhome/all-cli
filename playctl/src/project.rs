@@ -56,8 +56,7 @@ pub fn ensure_gitignore(project_root: &Path) -> Result<Option<&'static str>> {
         new.push('\n');
     }
     new.push_str("\n# live-playground\n.playgrounds/\n");
-    fs::write(&gi, new)
-        .with_context(|| ExitError::Env(format!("append {}", gi.display())))?;
+    fs::write(&gi, new).with_context(|| ExitError::Env(format!("append {}", gi.display())))?;
     Ok(Some("appended .playgrounds/ to .gitignore"))
 }
 

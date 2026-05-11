@@ -69,7 +69,11 @@ mod tests {
 
     #[test]
     fn port_exhausted_is_3() {
-        let err: anyhow::Error = ExitError::PortExhausted { start: 4747, tried: 16 }.into();
+        let err: anyhow::Error = ExitError::PortExhausted {
+            start: 4747,
+            tried: 16,
+        }
+        .into();
         assert_eq!(classify(&err), 3);
     }
 
@@ -106,8 +110,8 @@ mod tests {
 
         let io_err = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "denied");
         let result: Result<(), std::io::Error> = Err(io_err);
-        let wrapped: anyhow::Result<()> = result
-            .with_context(|| ExitError::Env(format!("write {}", "/tmp/x")));
+        let wrapped: anyhow::Result<()> =
+            result.with_context(|| ExitError::Env(format!("write {}", "/tmp/x")));
         let err = wrapped.unwrap_err();
         assert_eq!(classify(&err), 2);
     }
@@ -116,8 +120,8 @@ mod tests {
     fn with_context_user_error_classifies_correctly() {
         use anyhow::Context;
         let io_err = std::io::Error::other("x");
-        let r: anyhow::Result<()> = Err::<(), _>(io_err)
-            .with_context(|| ExitError::User("bad slug".into()));
+        let r: anyhow::Result<()> =
+            Err::<(), _>(io_err).with_context(|| ExitError::User("bad slug".into()));
         assert_eq!(classify(&r.unwrap_err()), 1);
     }
 
@@ -125,8 +129,8 @@ mod tests {
     fn with_context_internal_error_classifies_correctly() {
         use anyhow::Context;
         let io_err = std::io::Error::other("x");
-        let r: anyhow::Result<()> = Err::<(), _>(io_err)
-            .with_context(|| ExitError::Internal("boom".into()));
+        let r: anyhow::Result<()> =
+            Err::<(), _>(io_err).with_context(|| ExitError::Internal("boom".into()));
         assert_eq!(classify(&r.unwrap_err()), 5);
     }
 }

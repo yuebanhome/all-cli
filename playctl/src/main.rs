@@ -32,9 +32,18 @@ fn run(cli: &Cli) -> Result<()> {
         Cmd::Stop => cmd_stop(cli),
         Cmd::Status => cmd_status(cli),
         Cmd::List => cmd_list(cli),
-        Cmd::New { slug, template, title, description } => {
-            cmd_new(cli, slug, template, title.as_deref(), description.as_deref())
-        }
+        Cmd::New {
+            slug,
+            template,
+            title,
+            description,
+        } => cmd_new(
+            cli,
+            slug,
+            template,
+            title.as_deref(),
+            description.as_deref(),
+        ),
         Cmd::Reindex => cmd_reindex(cli),
         Cmd::Open { slug } => cmd_open(cli, slug.as_deref()),
         Cmd::PrintTemplate { name } => cmd_print_template(name),
@@ -122,7 +131,7 @@ fn cmd_start(cli: &Cli) -> Result<()> {
             std::thread::sleep(Duration::from_millis(100));
         }
         let _ = child.kill();
-        return Err(anyhow::anyhow!(ExitError::ServerNotUp { timeout_ms: 5000 }));
+        Err(anyhow::anyhow!(ExitError::ServerNotUp { timeout_ms: 5000 }))
     }
 
     #[cfg(not(unix))]
@@ -219,10 +228,7 @@ fn cmd_list(cli: &Cli) -> Result<()> {
     let port = playctl::proc::read_handle(&root)
         .map(|h| h.port)
         .unwrap_or(cli.port);
-    println!(
-        "{:<24} {:<28} {:<32} {}",
-        "SLUG", "TITLE", "URL", "CREATED"
-    );
+    println!("{:<24} {:<28} {:<32} CREATED", "SLUG", "TITLE", "URL");
     for p in &idx.playgrounds {
         println!(
             "{:<24} {:<28} {:<32} {}",
@@ -405,27 +411,27 @@ fn open_url(url: &str) -> bool {
 
     #[cfg(target_os = "macos")]
     {
-        return Command::new("open")
+        Command::new("open")
             .arg(url)
             .status()
             .map(|s| s.success())
-            .unwrap_or(false);
+            .unwrap_or(false)
     }
     #[cfg(all(unix, not(target_os = "macos")))]
     {
-        return Command::new("xdg-open")
+        Command::new("xdg-open")
             .arg(url)
             .status()
             .map(|s| s.success())
-            .unwrap_or(false);
+            .unwrap_or(false)
     }
     #[cfg(windows)]
     {
-        return Command::new("cmd.exe")
+        Command::new("cmd.exe")
             .args(["/c", "start", "", url])
             .status()
             .map(|s| s.success())
-            .unwrap_or(false);
+            .unwrap_or(false)
     }
 }
 

@@ -46,8 +46,8 @@ pub fn read_index(project_root: &Path) -> Result<Index> {
             .unwrap_or_else(|| "project".into());
         return Ok(Index::empty(&name));
     }
-    let body = fs::read_to_string(&p)
-        .with_context(|| ExitError::Env(format!("read {}", p.display())))?;
+    let body =
+        fs::read_to_string(&p).with_context(|| ExitError::Env(format!("read {}", p.display())))?;
     let idx: Index = serde_json::from_str(&body)
         .with_context(|| ExitError::Env(format!("parse {}", p.display())))?;
     if idx.version != 1 {
@@ -123,7 +123,8 @@ pub fn now_iso() -> String {
 fn file_mtime_iso(p: &Path) -> Option<String> {
     let m = fs::metadata(p).ok()?.modified().ok()?;
     let dt: OffsetDateTime = m.into();
-    dt.format(&time::format_description::well_known::Rfc3339).ok()
+    dt.format(&time::format_description::well_known::Rfc3339)
+        .ok()
 }
 
 fn extract_title(html: &str) -> Option<String> {
@@ -229,7 +230,11 @@ mod tests {
         let td = TempDir::new().unwrap();
         let path = index_path(td.path());
         fs::create_dir_all(path.parent().unwrap()).unwrap();
-        fs::write(&path, r#"{"version":2,"project_name":"p","playgrounds":[]}"#).unwrap();
+        fs::write(
+            &path,
+            r#"{"version":2,"project_name":"p","playgrounds":[]}"#,
+        )
+        .unwrap();
         let err = read_index(td.path()).unwrap_err();
         assert_eq!(crate::error::classify(&err), 2);
     }

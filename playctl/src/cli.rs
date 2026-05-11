@@ -79,12 +79,22 @@ mod tests {
     #[test]
     fn parses_new_with_flags() {
         let c = Cli::try_parse_from([
-            "playctl", "new", "card-tuner", "--template", "design-playground",
-            "--title", "Card Tuner",
+            "playctl",
+            "new",
+            "card-tuner",
+            "--template",
+            "design-playground",
+            "--title",
+            "Card Tuner",
         ])
         .unwrap();
         match c.cmd {
-            Cmd::New { slug, template, title, description } => {
+            Cmd::New {
+                slug,
+                template,
+                title,
+                description,
+            } => {
                 assert_eq!(slug, "card-tuner");
                 assert_eq!(template, "design-playground");
                 assert_eq!(title.as_deref(), Some("Card Tuner"));
