@@ -201,8 +201,38 @@ fn print_url(cli: &Cli, port: u16) {
     }
 }
 
-fn cmd_list(_cli: &Cli) -> Result<()> {
-    todo!("Task 15")
+fn cmd_list(cli: &Cli) -> Result<()> {
+    let root = resolve_root(cli)?;
+    let idx = read_index(&root)?;
+    if cli.json {
+        let body = serde_json::to_string(&idx)
+            .with_context(|| ExitError::Internal("encode index".into()))?;
+        println!("{body}");
+        return Ok(());
+    }
+    if idx.playgrounds.is_empty() {
+        if !cli.quiet {
+            println!("no playgrounds in {}", root.display());
+        }
+        return Ok(());
+    }
+    let port = playctl::proc::read_handle(&root)
+        .map(|h| h.port)
+        .unwrap_or(cli.port);
+    println!(
+        "{:<24} {:<28} {:<32} {}",
+        "SLUG", "TITLE", "URL", "CREATED"
+    );
+    for p in &idx.playgrounds {
+        println!(
+            "{:<24} {:<28} {:<32} {}",
+            truncate(&p.slug, 24),
+            truncate(&p.title, 28),
+            format!("http://127.0.0.1:{port}/{}/", p.slug),
+            p.created_at
+        );
+    }
+    Ok(())
 }
 fn cmd_new(
     _cli: &Cli,
@@ -213,9 +243,36 @@ fn cmd_new(
 ) -> Result<()> {
     todo!("Task 16")
 }
-fn cmd_reindex(_cli: &Cli) -> Result<()> {
-    todo!("Task 15")
+fn cmd_reindex(cli: &Cli) -> Result<()> {
+    let root = resolve_root(cli)?;
+    let mut new = playctl::index::reindex(&root)?;
+    // 保留 template 字段（旧 index 里有，HTML 里没有）
+    if let Ok(old) = read_index(&root) {
+        for p in &mut new.playgrounds {
+            if let Some(prev) = old.playgrounds.iter().find(|x| x.slug == p.slug) {
+                if !prev.template.is_empty() {
+                    p.template = prev.template.clone();
+                }
+            }
+        }
+    }
+    playctl::index::write_index(&root, &new)?;
+    if !cli.quiet {
+        println!("reindexed {} playground(s)", new.playgrounds.len());
+    }
+    Ok(())
 }
+
+fn truncate(s: &str, max: usize) -> String {
+    if s.chars().count() <= max {
+        s.to_string()
+    } else {
+        let mut out: String = s.chars().take(max.saturating_sub(1)).collect();
+        out.push('…');
+        out
+    }
+}
+
 fn cmd_open(_cli: &Cli, _slug: Option<&str>) -> Result<()> {
     todo!("Task 17")
 }
