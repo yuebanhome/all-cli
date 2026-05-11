@@ -134,15 +134,82 @@ fn extract_title(html: &str) -> Option<String> {
     Some(html[start..start + end_rel].trim().to_string())
 }
 
+/// 从 HTML 中提取 `<meta name="description" content="...">` 的 content 值。
+///
+/// 顺序无关：`<meta content="..." name="description">` 也能识别。
+/// 引号支持双引号和单引号，属性匹配大小写不敏感。
+/// 只读第一个匹配的 meta 标签，best-effort，遇到畸形结构返回 None。
 fn extract_description(html: &str) -> Option<String> {
     let lower = html.to_ascii_lowercase();
-    let needle = "name=\"description\"";
-    let pos = lower.find(needle)?;
-    let after = &html[pos..];
-    let content_idx = after.to_ascii_lowercase().find("content=\"")? + "content=\"".len();
-    let after2 = &after[content_idx..];
-    let end = after2.find('"')?;
-    Some(after2[..end].trim().to_string())
+    let mut cursor = 0;
+    while let Some(rel) = lower[cursor..].find("<meta") {
+        let tag_start = cursor + rel;
+        // 标签后必须紧跟空白 / `>`，避免误匹配 `<metafoo>`。
+        let next_byte = lower.as_bytes().get(tag_start + 5).copied();
+        let is_meta = matches!(next_byte, Some(b) if b == b' ' || b == b'\t' || b == b'\n' || b == b'\r' || b == b'>' || b == b'/');
+        if !is_meta {
+            cursor = tag_start + 5;
+            continue;
+        }
+        let after = &lower[tag_start..];
+        let Some(end_rel) = after.find('>') else {
+            break;
+        };
+        let tag_lower = &after[..end_rel];
+        let tag_orig = &html[tag_start..tag_start + end_rel];
+        let name = attr_value(tag_lower, tag_orig, "name");
+        let is_description = name
+            .map(|v| v.eq_ignore_ascii_case("description"))
+            .unwrap_or(false);
+        if is_description {
+            if let Some(content) = attr_value(tag_lower, tag_orig, "content") {
+                return Some(content.trim().to_string());
+            }
+        }
+        cursor = tag_start + end_rel + 1;
+    }
+    None
+}
+
+/// 在已经截到 `<` 与 `>` 之间的 tag 字符串里找属性值。
+///
+/// `tag_lower` 和 `tag_orig` 字节长度必须一致（来自同一段切片）：用 lower
+/// 找属性边界与名字，用 orig 切取大小写敏感的值。
+fn attr_value<'a>(tag_lower: &str, tag_orig: &'a str, attr: &str) -> Option<&'a str> {
+    debug_assert_eq!(tag_lower.len(), tag_orig.len());
+    let needle = format!("{attr}=");
+    let mut pos = 0;
+    while let Some(rel) = tag_lower[pos..].find(&needle) {
+        let idx = pos + rel;
+        // 属性名前必须是空白（或紧跟 `<meta` 即 idx==5）；否则像 `xname=` 这种
+        // 子串匹配要跳过。
+        let prev_ok = idx == 0
+            || idx == 5
+            || tag_lower.as_bytes()[idx - 1].is_ascii_whitespace()
+            || tag_lower.as_bytes()[idx - 1] == b'/';
+        if !prev_ok {
+            pos = idx + needle.len();
+            continue;
+        }
+        let value_start = idx + needle.len();
+        let bytes = tag_orig.as_bytes();
+        let first = *bytes.get(value_start)?;
+        let (body_start, terminator): (usize, &[u8]) = match first {
+            b'"' => (value_start + 1, b"\""),
+            b'\'' => (value_start + 1, b"'"),
+            _ => {
+                // 无引号属性值：以空白或标签结束截止
+                let end_off = tag_orig[value_start..]
+                    .find(|c: char| c.is_whitespace() || c == '>')
+                    .unwrap_or(tag_orig.len() - value_start);
+                return Some(&tag_orig[value_start..value_start + end_off]);
+            }
+        };
+        let rest = &tag_orig[body_start..];
+        let end_rel = rest.find(|c: char| c == terminator[0] as char)?;
+        return Some(&rest[..end_rel]);
+    }
+    None
 }
 
 #[cfg(test)]
@@ -195,6 +262,39 @@ mod tests {
     fn extract_description_works() {
         let s = r#"<meta name="description" content="my desc">"#;
         assert_eq!(extract_description(s), Some("my desc".into()));
+    }
+
+    #[test]
+    fn extract_description_handles_reversed_attribute_order() {
+        // content 在 name 之前 —— 旧的 contains 顺序解析会丢失这种 HTML。
+        let s = r#"<meta content="reverse order" name="description">"#;
+        assert_eq!(extract_description(s), Some("reverse order".into()));
+    }
+
+    #[test]
+    fn extract_description_handles_single_quotes() {
+        let s = r#"<meta name='description' content='sq desc'>"#;
+        assert_eq!(extract_description(s), Some("sq desc".into()));
+    }
+
+    #[test]
+    fn extract_description_skips_unrelated_meta() {
+        let s = r#"<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<meta content="found" name="description">"#;
+        assert_eq!(extract_description(s), Some("found".into()));
+    }
+
+    #[test]
+    fn extract_description_no_match_returns_none() {
+        let s = r#"<meta name="author" content="someone">"#;
+        assert_eq!(extract_description(s), None);
+    }
+
+    #[test]
+    fn extract_description_case_insensitive_attribute() {
+        let s = r#"<META NAME="DESCRIPTION" CONTENT="upper">"#;
+        assert_eq!(extract_description(s), Some("upper".into()));
     }
 
     #[test]

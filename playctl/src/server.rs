@@ -1,5 +1,6 @@
 use crate::error::ExitError;
 use crate::index;
+use crate::slug::is_valid_slug;
 use crate::templates;
 use anyhow::{Context, Result};
 use axum::{
@@ -47,15 +48,14 @@ async fn index_page(State(s): State<AppState>) -> Response<Body> {
         Ok(b) => b,
         Err(_) => return server_error("index template missing"),
     };
-    let mut html = String::from_utf8_lossy(&html_bytes).into_owned();
+    let template = String::from_utf8_lossy(&html_bytes);
     let project_name = s
         .project_root
         .file_name()
         .map(|x| x.to_string_lossy().into_owned())
         .unwrap_or_else(|| "project".into());
-    html = html.replace("{{project_name}}", &html_escape(&project_name));
-    html = html.replace("{{port}}", &s.port.to_string());
-    html = html.replace("{{version}}", VERSION);
+    let port_str = s.port.to_string();
+    let html = render_index_template(&template, &project_name, &port_str, VERSION);
 
     Response::builder()
         .status(StatusCode::OK)
@@ -63,6 +63,40 @@ async fn index_page(State(s): State<AppState>) -> Response<Body> {
         .header(header::CACHE_CONTROL, "no-cache")
         .body(Body::from(html))
         .unwrap()
+}
+
+/// 一次性扫描 `{{token}}` 占位符并按位替换，避免顺序 `String::replace` 导致
+/// 用户值（如目录名 `foo{{port}}`）被二次替换。
+///
+/// 识别的 token 只有 `project_name` / `port` / `version`；未识别的 `{{...}}`
+/// 原样保留。`project_name` 在写入前经过 `html_escape`。
+fn render_index_template(template: &str, project_name: &str, port: &str, version: &str) -> String {
+    let mut out = String::with_capacity(template.len() + 64);
+    let mut rest = template;
+    while let Some(idx) = rest.find("{{") {
+        out.push_str(&rest[..idx]);
+        let after = &rest[idx + 2..];
+        let Some(end) = after.find("}}") else {
+            // 模板里有未闭合的 `{{`，原样输出剩余内容并退出。
+            out.push_str("{{");
+            out.push_str(after);
+            return out;
+        };
+        let token = &after[..end];
+        match token {
+            "project_name" => out.push_str(&html_escape(project_name)),
+            "port" => out.push_str(port),
+            "version" => out.push_str(version),
+            _ => {
+                out.push_str("{{");
+                out.push_str(token);
+                out.push_str("}}");
+            }
+        }
+        rest = &after[end + 2..];
+    }
+    out.push_str(rest);
+    out
 }
 
 async fn style_css() -> Response<Body> {
@@ -152,6 +186,11 @@ async fn slug_static(State(s): State<AppState>, uri: Uri) -> Response<Body> {
 ///
 /// rest 取自 URL path，未做 percent-decode；ServeDir 自身已经拒绝 `..` /
 /// 绝对根 / Windows 盘符等组件，这里只额外验 canonical 仍位于 serve_root 内。
+///
+/// **TOCTOU 取舍**：本函数在 canonicalize 失败时 fail-open（返回 true），把判断
+/// 让给后续 ServeDir。这覆盖了"路径不存在 → 正常 404"的常态；但也意味着
+/// 在 canonicalize 与 ServeDir open 之间存在窗口，被攻击者补出文件即逃逸。
+/// 本服务定位为单用户本地 dev server（仅绑定 127.0.0.1），该 TOCTOU 接受。
 fn is_inside_serve_root(serve_root: &std::path::Path, rest: &str) -> bool {
     let rel = std::path::Path::new(rest);
     let target = serve_root.join(rel);
@@ -165,18 +204,6 @@ fn is_inside_serve_root(serve_root: &std::path::Path, rest: &str) -> bool {
         Err(_) => return false,
     };
     target_can.starts_with(&root_can)
-}
-
-fn is_valid_slug(s: &str) -> bool {
-    if s.is_empty() || s.len() > 64 {
-        return false;
-    }
-    let mut chars = s.chars();
-    let first = chars.next().unwrap();
-    if !first.is_ascii_lowercase() && !first.is_ascii_digit() {
-        return false;
-    }
-    chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
 fn not_found() -> Response<Body> {
@@ -248,15 +275,42 @@ mod tests {
     use super::*;
 
     #[test]
-    fn slug_validates() {
-        assert!(is_valid_slug("foo"));
-        assert!(is_valid_slug("foo-bar"));
-        assert!(is_valid_slug("a1b2"));
-        assert!(!is_valid_slug(""));
-        assert!(!is_valid_slug("Foo"));
-        assert!(!is_valid_slug("-foo"));
-        assert!(!is_valid_slug("foo/bar"));
-        assert!(!is_valid_slug(".."));
-        assert!(!is_valid_slug("a".repeat(65).as_str()));
+    fn render_replaces_known_tokens() {
+        let out = render_index_template(
+            "<a>{{project_name}}</a> port {{port}} v{{version}}",
+            "demo",
+            "4747",
+            "0.1.0",
+        );
+        assert_eq!(out, "<a>demo</a> port 4747 v0.1.0");
+    }
+
+    #[test]
+    fn render_html_escapes_project_name() {
+        let out = render_index_template("{{project_name}}", "a<b>&c\"", "0", "0");
+        assert_eq!(out, "a&lt;b&gt;&amp;c&quot;");
+    }
+
+    #[test]
+    fn render_does_not_re_substitute_user_value() {
+        // 用户的项目目录名恰好叫 "foo{{port}}"：第一遍替换 project_name 后，
+        // 顺序 String::replace 会把目录名里的 {{port}} 再当作模板 token 替换，
+        // 输出 "foo4747"。一次性扫描实现必须保留原样 "foo{{port}}"
+        // (html_escape 不动 `{` `}` 字符)。
+        let out =
+            render_index_template("{{project_name}}-{{port}}", "foo{{port}}", "4747", "0.1.0");
+        assert_eq!(out, "foo{{port}}-4747");
+    }
+
+    #[test]
+    fn render_unknown_token_kept_verbatim() {
+        let out = render_index_template("a{{nope}}b", "x", "0", "0");
+        assert_eq!(out, "a{{nope}}b");
+    }
+
+    #[test]
+    fn render_unclosed_brace_kept() {
+        let out = render_index_template("a{{port", "x", "0", "0");
+        assert_eq!(out, "a{{port");
     }
 }

@@ -88,3 +88,33 @@ fn unknown_template_rejected() {
         .code(1)
         .stderr(str::contains("unknown template"));
 }
+
+#[test]
+fn open_rejects_invalid_slug() {
+    // 防 cmd.exe / xdg-open / wslview 参数注入：传 "../foo" 这种非法 slug
+    // 必须在拼 URL 前被拒绝，退出码 1，不能去 spawn 任何 opener。
+    let td = TempDir::new().unwrap();
+    fs::create_dir_all(td.path().join(".git")).unwrap();
+    bin()
+        .args(["--root"])
+        .arg(td.path())
+        .args(["open", "../foo"])
+        .assert()
+        .failure()
+        .code(1)
+        .stderr(str::contains("invalid slug"));
+}
+
+#[test]
+fn open_rejects_slug_with_slash() {
+    let td = TempDir::new().unwrap();
+    fs::create_dir_all(td.path().join(".git")).unwrap();
+    bin()
+        .args(["--root"])
+        .arg(td.path())
+        .args(["open", "foo/bar"])
+        .assert()
+        .failure()
+        .code(1)
+        .stderr(str::contains("invalid slug"));
+}

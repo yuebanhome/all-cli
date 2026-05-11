@@ -26,28 +26,36 @@ impl ExitError {
     }
 }
 
-/// 把 anyhow::Error 链上的 Display 串接起来，按 ExitError 各变体的消息前缀分流到 exit code。
-/// 这种字符串方法比 downcast 更鲁棒：`with_context(|| ExitError::X(...))` 把类型擦除成
-/// `ContextError`，downcast 就拿不到原 ExitError；而 ContextError 的 Display 仍然是 X 的 Display，
-/// 所以前缀匹配照样命中。
+/// 按 ExitError 各变体的 Display 前缀，从 anyhow::Error 链上分流到 exit code。
+///
+/// 用前缀匹配而非 downcast：`with_context(|| ExitError::X(...))` 会把类型擦成
+/// `ContextError`，downcast 拿不到原 ExitError；但 ContextError 的 Display 仍然
+/// 是 X 的 Display，因此 chain 里某一段一定会以 X 的固定前缀开头。
+///
+/// 对每段单独 `starts_with` 检查，不把整条链 join 后做 `contains`，避免用户
+/// 字符串（路径名、用户输入）恰好包含 "user error:" / "env error:" 字面量时被
+/// 错误分类。
 pub fn classify(err: &anyhow::Error) -> u8 {
-    let mut buf = err.to_string();
-    for cause in err.chain().skip(1) {
-        buf.push_str(" | ");
-        buf.push_str(&cause.to_string());
+    for link in err.chain() {
+        let s = link.to_string();
+        if s.starts_with("user error:") {
+            return 1;
+        }
+        if s.starts_with("env error:") {
+            return 2;
+        }
+        if s.starts_with("port exhaustion:") {
+            return 3;
+        }
+        if s.starts_with("server failed to start within") {
+            return 4;
+        }
+        if s.starts_with("internal error:") {
+            return 5;
+        }
     }
-    if buf.contains("user error:") {
-        1
-    } else if buf.contains("env error:") {
-        2
-    } else if buf.contains("port exhaustion:") {
-        3
-    } else if buf.contains("server failed to start within") {
-        4
-    } else {
-        // Internal 与未知错误都映射到 5；放在最后兜底。
-        5
-    }
+    // 未在链上找到任一变体前缀（裸 anyhow!("...") 等）→ 视为 Internal。
+    5
 }
 
 #[cfg(test)]
@@ -132,5 +140,29 @@ mod tests {
         let r: anyhow::Result<()> =
             Err::<(), _>(io_err).with_context(|| ExitError::Internal("boom".into()));
         assert_eq!(classify(&r.unwrap_err()), 5);
+    }
+
+    #[test]
+    fn user_payload_with_marker_does_not_collide() {
+        // 如果 payload 字面量里含 "user error:" / "env error:" 等，前缀匹配
+        // (per-chain starts_with) 必须只看每段开头而不是 contains 整段；
+        // 否则用户输入就能伪造分类。
+        let inner: anyhow::Error = ExitError::Internal("rejected user error: forged".into()).into();
+        assert_eq!(classify(&inner), 5);
+
+        let inner2: anyhow::Error =
+            ExitError::Env("read /tmp/contains env error: in name".into()).into();
+        assert_eq!(classify(&inner2), 2);
+    }
+
+    #[test]
+    fn context_payload_containing_marker_does_not_collide() {
+        use anyhow::Context;
+        let io_err = std::io::Error::other("x");
+        // Context 字符串里恰好含 "user error:" 字面量，但 ExitError 自己是
+        // Internal —— 应当分类为 5 而不是被字符串干扰到 1。
+        let wrapped: anyhow::Result<()> = Err::<(), _>(io_err)
+            .with_context(|| ExitError::Internal("payload mentions user error: foo".into()));
+        assert_eq!(classify(&wrapped.unwrap_err()), 5);
     }
 }

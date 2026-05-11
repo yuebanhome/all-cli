@@ -10,6 +10,7 @@ use playctl::{
     },
     project::{detect_project_root, ensure_gitignore},
     server::run as server_run,
+    slug::is_valid_slug,
 };
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -231,9 +232,15 @@ fn cmd_list(cli: &Cli) -> Result<()> {
         }
         return Ok(());
     }
-    let port = playctl::proc::read_handle(&root)
-        .map(|h| h.port)
-        .unwrap_or(cli.port);
+    let handle = playctl::proc::read_handle(&root);
+    let port = handle.as_ref().map(|h| h.port).unwrap_or(cli.port);
+    if handle.is_none() && !cli.quiet {
+        // 服务未在跑 → URL 用 cli.port 兜底，但下次 `playctl start` 实际占用
+        // 端口可能因 pick_port 偏移而不同；明确标注避免用户被误导。
+        println!(
+            "(server stopped; URLs below use base port {port}, actual port chosen at next start)"
+        );
+    }
     println!("{:<24} {:<28} {:<32} CREATED", "SLUG", "TITLE", "URL");
     for p in &idx.playgrounds {
         println!(
@@ -253,7 +260,7 @@ fn cmd_new(
     title: Option<&str>,
     description: Option<&str>,
 ) -> Result<()> {
-    if !is_valid_new_slug(slug) {
+    if !is_valid_slug(slug) {
         return Err(anyhow::anyhow!(ExitError::User(format!(
             "invalid slug '{slug}'; must match [a-z0-9][a-z0-9-]{{0,63}}"
         ))));
@@ -342,18 +349,6 @@ fn truncate(s: &str, max: usize) -> String {
     }
 }
 
-fn is_valid_new_slug(s: &str) -> bool {
-    if s.is_empty() || s.len() > 64 {
-        return false;
-    }
-    let mut chars = s.chars();
-    let first = chars.next().unwrap();
-    if !first.is_ascii_lowercase() && !first.is_ascii_digit() {
-        return false;
-    }
-    chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
-}
-
 fn humanize(slug: &str) -> String {
     slug.split('-')
         .map(|w| {
@@ -371,7 +366,7 @@ fn cmd_open(cli: &Cli, slug: Option<&str>) -> Result<()> {
     // 校验 slug 合法性，避免把任意字符串塞进 xdg-open / wslview / cmd.exe 参数。
     // 即便 Rust 1.77 之后 `Command` 对 `.bat`/`.cmd` 注入做了转义，仍保持显式拒绝。
     if let Some(s) = slug {
-        if !is_valid_new_slug(s) {
+        if !is_valid_slug(s) {
             return Err(anyhow::anyhow!(ExitError::User(format!(
                 "invalid slug '{s}'; must match [a-z0-9][a-z0-9-]{{0,63}}"
             ))));

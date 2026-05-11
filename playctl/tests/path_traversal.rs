@@ -1,6 +1,7 @@
 use playctl::server::{build_router, AppState};
 use std::net::TcpListener;
 use std::sync::Arc;
+use tokio::sync::oneshot;
 
 #[test]
 fn slug_path_with_dotdot_returns_404() {
@@ -14,6 +15,9 @@ fn slug_path_with_dotdot_returns_404() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
 
+    // graceful shutdown：测试断言完后 drop(tx) 让 axum::serve 立即返回；不再
+    // 依赖 5s 总 timeout 兜底，避免 cargo test 退出时硬拖 5 秒。
+    let (tx, rx) = oneshot::channel::<()>();
     let handle = std::thread::spawn(move || {
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -22,8 +26,11 @@ fn slug_path_with_dotdot_returns_404() {
         rt.block_on(async move {
             listener.set_nonblocking(true).ok();
             let l = tokio::net::TcpListener::from_std(listener).unwrap();
-            let server = axum::serve(l, app);
-            let _ = tokio::time::timeout(std::time::Duration::from_secs(5), server).await;
+            let _ = axum::serve(l, app)
+                .with_graceful_shutdown(async move {
+                    let _ = rx.await;
+                })
+                .await;
         });
     });
 
@@ -37,6 +44,7 @@ fn slug_path_with_dotdot_returns_404() {
         "expected 404/400 for path traversal, got {}",
         resp.status()
     );
+    let _ = tx.send(());
     let _ = handle.join();
 }
 
