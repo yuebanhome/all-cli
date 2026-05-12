@@ -40,6 +40,7 @@ live-playground v2 问答页面的 CSS 设计 token 规范：所有色值、间�
 
   /* 圆角 */
   --r-1: 4px; --r-2: 8px; --r-3: 12px; --r-pill: 999px;
+  --ring-selected: 2px;
 
   /* 阴影 */
   --shadow-1: 0 1px 2px rgba(0,0,0,.4);
@@ -82,7 +83,7 @@ live-playground v2 问答页面的 CSS 设计 token 规范：所有色值、间�
 
 | 控件 | default | hover | focus-visible | active | selected |
 |---|---|---|---|---|---|
-| 卡片选项 | bg-surface, border-1 | border-2 | + shadow-focus | bg-elevated | accent border + 2px inner ring |
+| 卡片选项 | bg-surface, border-1 | border-2 | + shadow-focus | bg-elevated | accent border + var(--ring-selected) inner ring |
 | 按钮主 | accent / accent-fg | `filter: brightness(1.05)` | + shadow-focus | `brightness(.95)` | n/a |
 | 按钮次 | bg-surface, border-1 | border-2 | + shadow-focus | bg-elevated | n/a |
 | range | track 用 border-1，filled 用 accent | thumb 放大 | thumb shadow-focus | — | — |

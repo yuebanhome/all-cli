@@ -19,7 +19,7 @@ slug 字面值仍需满足 `^[a-z0-9][a-z0-9-]{0,63}$`（详见 SKILL.md 顶部�
 
 每轮 HTML 顶部必须**内联上一轮**的 `ask-result` YAML 主体，以人类可读的形式呈现，默认折叠。实现上用原生 `<details>` 元素——不需要 JS，不需要 ARIA role，浏览器自带键盘可达和动画语义。
 
-AI 在重写 HTML 时，把上一轮收到的 fenced `ask-result` 块里的 YAML 主体抽出来（去掉围栏行与 header，只保留主体），原样塞进 `<details>` 内部的 `<pre><code>` 块。示意片段：
+AI 在重写 HTML 时，把上一轮收到的 fenced `ask-result` 块里的 YAML 主体抽出来（去掉围栏行与 header，只保留主体），保留 YAML 的换行与缩进后放进 `<details>` 内部的 `<pre><code>` 块。**必须先做 HTML escape**（至少转义 `&` / `<` / `>`，必要时也转义 `"` / `'`），避免用户 note 里的 HTML 片段或 `</code>` 打断页面结构。示意片段：
 
 ```html
 <details class="prev-round">
@@ -29,7 +29,7 @@ note: 因为 B 的视觉层级最清晰</code></pre>
 </details>
 ```
 
-`<summary>` 文本固定写"Round N 答案"，N 是上一轮的 round 数字（不是当前轮）。`<pre><code>` 内保留 YAML 的换行与缩进，不做 markdown 转义。
+`<summary>` 文本固定写"Round N 答案"，N 是上一轮的 round 数字（不是当前轮）。`<pre><code>` 内保留 YAML 的换行与缩进，**不做 markdown 渲染**；但写入 HTML 前必须做 HTML escape。
 
 `open` 属性是否默认开启由 AI 判断：多数情况下首次重写后默认 `closed`（去掉 `open` 属性即可），让用户的视觉焦点落在新一轮的问题区，不被旧答案分散；但若**上一轮答案对本轮决策有强依赖**（譬如上轮选了某个配色，本轮要在该配色下挑字号），应保持 `open`，方便用户随时回看。再往后的轮次（Round 3+）只显示**上一轮**的折叠区，不要叠加历史所有轮次，否则页面顶部会越积越长。
 

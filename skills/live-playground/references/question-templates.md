@@ -207,7 +207,7 @@ ratings:
 </ol>
 ```
 
-JS 监听按钮 click 与全局 keydown：按钮 Tab 可达，Enter/Space 触发；触发后交换 `<li>` 在 DOM 中的位置并刷新 sticky 预览区 `order[]`。drag-and-drop 可在 `dragstart` / `dragover` / `drop` 上额外绑定，但必须确保**关闭 JS 后仅靠按钮也能完整完成排序**。
+JS 监听按钮 click 与全局 keydown：按钮 Tab 可达，Enter/Space 触发；触发后交换 `<li>` 在 DOM 中的位置并刷新 sticky 预览区 `order[]`。drag-and-drop 可在 `dragstart` / `dragover` / `drop` 上额外绑定，但必须确保**不依赖 drag-and-drop**：仅靠原生按钮 + JS 也能完整完成排序。
 
 **YAML 顶层键**
 
@@ -303,8 +303,8 @@ fields:
       <span class="annot-id" style="font-family:var(--font-mono); color:var(--text-2);">§1</span>
       <span class="annot-title" style="color:var(--text-1);">提案标题摘要</span>
     </div>
-    <div class="annot-actions" role="radiogroup" aria-label="对 §1 的判定"
-         style="display:flex; gap:var(--sp-2);">
+    <div class="annot-actions" aria-label="对 §1 的判定"
+         style="display:flex; gap:var(--sp-2);" data-selected="">
       <button type="button" data-verdict="approve" aria-pressed="false">✓ 通过</button>
       <button type="button" data-verdict="reject"  aria-pressed="false">✗ 否决</button>
       <button type="button" data-verdict="comment" aria-pressed="false">💬 评论</button>
@@ -319,7 +319,7 @@ fields:
 </ul>
 ```
 
-JS 单击按钮：组内三个按钮互斥更新 `aria-pressed`；选 comment 时移除 textarea 的 `hidden`、focus 进去；选 approve/reject 时再加回 `hidden` 并清空。空态（一项未操作）在 sticky 预览区显式提示"未对 §K 给出判定"。
+JS 单击按钮：组内三个按钮互斥更新 `aria-pressed`（同一项内永远只有一个按钮为 `true`，其余为 `false`），并把当前 verdict 写到父级 `data-selected`；选 comment 时移除 textarea 的 `hidden`、focus 进去；选 approve/reject 时再加回 `hidden` 并清空。空态（一项未操作）在 sticky 预览区显式提示"未对 §K 给出判定"。
 
 **YAML 顶层键**
 
@@ -339,7 +339,7 @@ items:
 
 **键盘可达性要点**
 
-- 每项的三按钮组 `role="radiogroup"` + 子按钮 `aria-pressed`：Tab 进入第一项，方向键在组内三按钮间切换并触发选择（自实现），Enter/Space 也可触发当前焦点按钮。
+- 每项的三按钮组使用互斥 toggle buttons：子按钮是原生 `<button>` + `aria-pressed`，**不要**给父级加 `role="radiogroup"`，也不要把 `aria-pressed` 与 radio 语义混用。Tab 进入第一个按钮后，可用方向键在组三个按钮间移动并触发选择（自实现），Enter/Space 也可触发当前焦点按钮。
 - 选 comment 后焦点**自动跳到 textarea**，省一次 Tab；离开 textarea 后 Shift+Tab 回按钮组。
 - 列表项之间 Tab 穿过按钮组 → textarea（若展开）→ 下一项按钮组，顺序与视觉一致。
 - 三按钮文字（✓ 通过 / ✗ 否决 / 💬 评论）+ 图标双重表达态，颜色不是唯一线索。
